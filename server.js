@@ -7,14 +7,13 @@ const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cloudinary = require('cloudinary').v2;
 
-// 1. מפתח ג'מיני:
-const genAI = new GoogleGenerativeAI('AIzaSyCNovA_E4NFRZ-QLVjaqYp816z7SS_U6rc');
+// השרת ימשוך את המפתחות מההגדרות המאובטחות ב-Render
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 2. מפתחות קלאודינרי (העתק מהאתר שלהם):
 cloudinary.config({
-  cloud_name: 'dfmh32zbg',
-  api_key: '261223895863227',
-  api_secret: 'bRbkbM2uP9OzzU7HxkSd7Sd5Tvk'
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.CLOUD_API_KEY,
+  api_secret: process.env.CLOUD_API_SECRET
 });
 
 const app = express();
@@ -66,7 +65,6 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     const fileData = fs.readFileSync(req.file.path);
     const imageBase64 = { inlineData: { data: fileData.toString("base64"), mimeType: req.file.mimetype } };
 
-    // --- אבחון בינה מלאכותית ---
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
       generationConfig: { responseMimeType: "application/json" }
@@ -102,14 +100,13 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         wineData.aiInsights = '';
     }
 
-    // --- העלאה חכמה לענן ומחיקה מקומית ---
     const cloudinaryResponse = await cloudinary.uploader.upload(req.file.path, {
         folder: 'wine_cellar'
     });
-    fs.unlinkSync(req.file.path); // מוחק את העותק הזמני מהמחשב
+    fs.unlinkSync(req.file.path); 
 
     res.json({ 
-      imageUrl: cloudinaryResponse.secure_url, // עכשיו התמונה מוגשת בבטחה מהענן!
+      imageUrl: cloudinaryResponse.secure_url, 
       analyzedData: wineData
     });
 
@@ -156,4 +153,5 @@ app.put('/api/wines/:id', async (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log('Smart server running on port 3000'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Smart server running on port ${PORT}`));
