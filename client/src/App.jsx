@@ -24,7 +24,7 @@ function App() {
 
   const fetchWines = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/wines');
+      const response = await fetch('https://wine-app-server.onrender.com/api/wines');
       if (!response.ok) throw new Error('Network error');
       const data = await response.json();
       setWinesList(data);
@@ -75,7 +75,7 @@ function App() {
     try {
       const imageFormData = new FormData();
       imageFormData.append('image', file);
-      const response = await fetch('http://localhost:3000/api/analyze', { method: 'POST', body: imageFormData });
+      const response = await fetch('https://wine-app-server.onrender.com/api/analyze', { method: 'POST', body: imageFormData });
       const data = await response.json();
       
       if (response.ok) {
@@ -102,7 +102,7 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
-    const url = editingId ? `http://localhost:3000/api/wines/${editingId}` : 'http://localhost:3000/api/wines';
+    const url = editingId ? `https://wine-app-server.onrender.com/api/wines/${editingId}` : 'https://wine-app-server.onrender.com/api/wines';
     const method = editingId ? 'PUT' : 'POST';
 
     try {
@@ -124,7 +124,7 @@ function App() {
   const handleDelete = async (id) => {
     if (!window.confirm('האם למחוק את היין מהמרתף? פעולה זו בלתי הפיכה.')) return;
     try {
-      await fetch(`http://localhost:3000/api/wines/${id}`, { method: 'DELETE' });
+      await fetch(`https://wine-app-server.onrender.com/api/wines/${id}`, { method: 'DELETE' });
       fetchWines();
     } catch (error) { alert('שגיאה במחיקה.'); }
   };
