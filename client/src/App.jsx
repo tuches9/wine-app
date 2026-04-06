@@ -741,9 +741,14 @@ function App() {
                     </div>
                   )}
 
-                  <div style={{ marginTop: 'auto', display: 'flex', gap: '15px', paddingTop: '20px', borderTop: '1px solid #EAE6DF' }}>
-                    <button className="btn-pill-outline" onClick={() => startEdit(wine)} style={{ flex: 1 }}>{wine.bottleStatus === 'stored' ? 'פתיחת הבקבוק' : 'עריכה'}</button>
-                    <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9' }}>מחיקה</button>
+                  <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid #EAE6DF' }}>
+                    <div style={{ marginBottom: '15px', color: '#9C898E', fontSize: '0.85rem' }}>
+                      נוסף למערכת: {formatPerfectDate(wine.dateOpened)}
+                    </div>
+                    <div style={{ display: 'flex', gap: '15px' }}>
+                      <button className="btn-pill-outline" onClick={() => startEdit(wine)} style={{ flex: 1 }}>{wine.bottleStatus === 'stored' ? 'פתיחת הבקבוק' : 'עריכה'}</button>
+                      <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9' }}>מחיקה</button>
+                    </div>
                   </div>
                 </div>
               </div>
