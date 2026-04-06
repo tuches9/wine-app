@@ -16,12 +16,15 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [winesList, setWinesList] = useState([]);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('הכל');
   const [currentView, setCurrentView] = useState('scan'); 
   const [cellarTab, setCellarTab] = useState('drank'); 
+  
+  // הגדרות סינון ומיון חדשות
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('הכל');
+  const [filterCountry, setFilterCountry] = useState('הכל');
+  const [sortOption, setSortOption] = useState('dateOpened_desc');
 
-  // הקישור לשרת ברנדר
   const API_BASE_URL = 'https://wine-app-server.onrender.com';
 
   const fetchWines = async () => {
@@ -206,6 +209,9 @@ function App() {
     return '';
   };
 
+  // מציאת כל המדינות הקיימות במרתף לטובת הסינון
+  const uniqueCountries = ['הכל', ...new Set(winesList.map(w => w.country).filter(c => c && c.trim() !== ''))].sort();
+
   const calculateStats = () => {
     if (winesList.length === 0) return null;
 
@@ -286,23 +292,50 @@ function App() {
 
   const stats = calculateStats();
 
-  const filteredWines = winesList.filter(wine => {
-    const isCorrectTab = (cellarTab === 'stored' && wine.bottleStatus === 'stored') || (cellarTab === 'drank' && wine.bottleStatus !== 'stored');
-    if (!isCorrectTab) return false;
+  // מנגנון הסינון והמיון המעודכן
+  const getSortedAndFilteredWines = () => {
+    let result = winesList.filter(wine => {
+      const isCorrectTab = (cellarTab === 'stored' && wine.bottleStatus === 'stored') || (cellarTab === 'drank' && wine.bottleStatus !== 'stored');
+      if (!isCorrectTab) return false;
 
-    const term = searchTerm.toLowerCase();
-    const matchesSearch = 
-      (wine.name && wine.name.toLowerCase().includes(term)) || 
-      (wine.producer && wine.producer.toLowerCase().includes(term)) ||
-      (wine.country && wine.country.toLowerCase().includes(term)) ||
-      (wine.region && wine.region.toLowerCase().includes(term)) ||
-      (wine.grapes && wine.grapes.toLowerCase().includes(term)) ||
-      (wine.location && wine.location.toLowerCase().includes(term)) ||
-      (wine.drankWith && wine.drankWith.toLowerCase().includes(term));
+      const term = searchTerm.toLowerCase();
+      const matchesSearch = 
+        (wine.name && wine.name.toLowerCase().includes(term)) || 
+        (wine.producer && wine.producer.toLowerCase().includes(term)) ||
+        (wine.region && wine.region.toLowerCase().includes(term)) ||
+        (wine.grapes && wine.grapes.toLowerCase().includes(term)) ||
+        (wine.location && wine.location.toLowerCase().includes(term)) ||
+        (wine.drankWith && wine.drankWith.toLowerCase().includes(term));
+        
+      const matchesType = filterType === 'הכל' || wine.wineType === filterType;
+      const matchesCountry = filterCountry === 'הכל' || wine.country === filterCountry;
       
-    const matchesType = filterType === 'הכל' || wine.wineType === filterType;
-    return matchesSearch && matchesType;
-  });
+      return matchesSearch && matchesType && matchesCountry;
+    });
+
+    result.sort((a, b) => {
+      switch (sortOption) {
+        case 'dateOpened_desc':
+          return new Date(b.dateOpened || 0) - new Date(a.dateOpened || 0);
+        case 'dateOpened_asc':
+          return new Date(a.dateOpened || 0) - new Date(b.dateOpened || 0);
+        case 'dateDrank_desc':
+          return new Date(b.dateDrank || 0) - new Date(a.dateDrank || 0);
+        case 'rating_desc':
+          return (Number(b.rating) || 0) - (Number(a.rating) || 0);
+        case 'price_desc':
+          return (Number(b.price) || 0) - (Number(a.price) || 0);
+        case 'country_asc':
+          return (a.country || '').localeCompare(b.country || '', 'he');
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  };
+
+  const sortedAndFilteredWines = getSortedAndFilteredWines();
 
   const modernStyles = `
     @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600&family=Frank+Ruhl+Libre:wght@300;400;700&display=swap');
@@ -419,6 +452,32 @@ function App() {
       outline: none;
       background-color: #FFFFFF;
       box-shadow: 0 0 0 2px #D3C3B0, inset 0 2px 5px rgba(0,0,0,0.01);
+    }
+
+    .filter-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 40px;
+      background-color: #FFFFFF;
+      padding: 20px;
+      border-radius: 24px;
+      box-shadow: 0 5px 25px rgba(0,0,0,0.03);
+      border: 1px solid #EFECE6;
+    }
+    
+    .filter-select {
+      flex: 1;
+      min-width: 120px;
+      border: 1px solid #EAE6DF;
+      background-color: #F8F7F5;
+      border-radius: 12px;
+      padding: 12px;
+      outline: none;
+      font-size: 1rem;
+      font-family: 'Assistant', sans-serif;
+      color: #5A5A5A;
+      cursor: pointer;
     }
 
     .btn-pill-primary {
@@ -658,30 +717,53 @@ function App() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '15px', marginBottom: '40px', backgroundColor: '#FFFFFF', padding: '10px 20px', borderRadius: '50px', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
+          <div className="filter-panel">
             <input 
               type="text" 
-              placeholder="חיפוש..." 
+              placeholder="חיפוש חופשי..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ flex: 2, border: 'none', backgroundColor: 'transparent', outline: 'none', fontSize: '1.05rem', fontFamily: 'Assistant' }}
+              style={{ flex: '1 1 200px', border: '1px solid #EAE6DF', backgroundColor: '#F8F7F5', outline: 'none', fontSize: '1rem', fontFamily: 'Assistant', padding: '12px', borderRadius: '12px' }}
             />
-            <div style={{ width: '1px', backgroundColor: '#EAE6DF', margin: '5px 0' }}></div>
+            
             <select 
               value={filterType} 
               onChange={(e) => setFilterType(e.target.value)}
-              style={{ flex: 1, border: 'none', backgroundColor: 'transparent', outline: 'none', fontSize: '1.05rem', fontFamily: 'Assistant', color: '#7D736A' }}
+              className="filter-select"
             >
-              <option value="הכל">הכל</option>
+              <option value="הכל">כל הסוגים</option>
               <option value="אדום">אדום</option>
               <option value="לבן">לבן</option>
               <option value="כתום">כתום</option>
               <option value="רוזה">רוזה</option>
             </select>
+
+            <select 
+              value={filterCountry} 
+              onChange={(e) => setFilterCountry(e.target.value)}
+              className="filter-select"
+            >
+              {uniqueCountries.map(country => (
+                <option key={country} value={country}>{country === 'הכל' ? 'כל המדינות' : country}</option>
+              ))}
+            </select>
+
+            <select 
+              value={sortOption} 
+              onChange={(e) => setSortOption(e.target.value)}
+              className="filter-select"
+            >
+              <option value="dateOpened_desc">הכי חדש במערכת</option>
+              <option value="dateOpened_asc">הכי ישן במערכת</option>
+              {cellarTab === 'drank' && <option value="dateDrank_desc">תאריך טעימה (מהחדש לישן)</option>}
+              {cellarTab === 'drank' && <option value="rating_desc">ציון (מהגבוה לנמוך)</option>}
+              <option value="price_desc">מחיר (מהיקר לזול)</option>
+              <option value="country_asc">לפי מדינה (א-ת)</option>
+            </select>
           </div>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '35px' }}>
-            {filteredWines.map((wine) => {
+            {sortedAndFilteredWines.map((wine) => {
               const typeStyle = getWineTypeStyle(wine.wineType);
               return (
               <div key={wine._id} className="soft-card" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -753,7 +835,7 @@ function App() {
                 </div>
               </div>
             )})}
-            {filteredWines.length === 0 && <p className="serif-title" style={{ color: '#BCAFA4', gridColumn: '1 / -1', textAlign: 'center', padding: '60px 0', fontSize: '1.5rem' }}>אין יינות בקטגוריה זו.</p>}
+            {sortedAndFilteredWines.length === 0 && <p className="serif-title" style={{ color: '#BCAFA4', gridColumn: '1 / -1', textAlign: 'center', padding: '60px 0', fontSize: '1.5rem' }}>אין יינות בקטגוריה זו.</p>}
           </div>
         </div>
       )}
