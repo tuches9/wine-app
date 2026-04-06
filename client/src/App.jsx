@@ -23,6 +23,9 @@ function App() {
   const [filterType, setFilterType] = useState('הכל');
   const [filterCountry, setFilterCountry] = useState('הכל');
   const [sortOption, setSortOption] = useState('dateDrank_desc');
+  
+  // State חדש לבחירת שנה בגרף
+  const [selectedGraphYear, setSelectedGraphYear] = useState(new Date().getFullYear());
 
   const API_BASE_URL = 'https://wine-app-server.onrender.com';
 
@@ -165,7 +168,7 @@ function App() {
 
   const startEdit = (wine) => {
     setEditingId(wine._id);
-    setFormData({ ...initialFormState, ...wine, bottleStatus: 'drank' });
+    setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus || 'drank' });
     setPreviewUrl(wine.imageUrl);
     setCurrentView('scan'); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -271,6 +274,15 @@ function App() {
       count: countryRatings[c].count
     })).sort((a,b) => b.avg - a.avg).slice(0, 5); 
 
+    // מציאת השנים הזמינות לגרף
+    const yearsSet = new Set(drankWines.map(w => {
+      const dStr = w.dateDrank || w.dateOpened;
+      return dStr ? new Date(dStr).getFullYear() : null;
+    }).filter(y => y && !isNaN(y)));
+    const availableYears = [...yearsSet].sort((a,b) => b - a);
+    if (availableYears.length === 0) availableYears.push(new Date().getFullYear());
+
+    // ספירת חודשים עבור השנה הנבחרת בלבד
     const monthCounts = {};
     drankWines.forEach(w => {
       const dateStr = w.dateDrank || w.dateOpened;
@@ -282,14 +294,19 @@ function App() {
         }
       }
     });
-    const sortedMonths = Object.keys(monthCounts).sort();
-    const graphData = sortedMonths.map(m => {
-      const [year, month] = m.split('-');
-      const monthName = new Date(year, month - 1).toLocaleString('he-IL', { month: 'short' });
-      return { name: `${monthName} ${year.substring(2)}`, בקבוקים: monthCounts[m] };
+
+    // בניית מערך מלא של כל חודשי השנה עבור השנה שנבחרה (כדי להציג גם 0)
+    const hebrewMonths = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+    const graphData = hebrewMonths.map((monthName, index) => {
+      const monthStr = String(index + 1).padStart(2, '0');
+      const key = `${selectedGraphYear}-${monthStr}`;
+      return { 
+        name: monthName, 
+        בקבוקים: monthCounts[key] || 0 
+      };
     });
 
-    return { totalDrank: drankWines.length, totalStored: storedWines.length, avgRating, avgPrice, favoriteType, topLocations, topLocation, topCountriesVolume, topCountry, bestWine, countryAverages, graphData };
+    return { totalDrank: drankWines.length, totalStored: storedWines.length, avgRating, avgPrice, favoriteType, topLocations, topLocation, topCountriesVolume, topCountry, bestWine, countryAverages, graphData, availableYears };
   };
 
   const stats = calculateStats();
@@ -569,7 +586,7 @@ function App() {
       <div className="nav-pill-container">
         <div className="nav-pill">
           <div className={`nav-item ${currentView === 'scan' ? 'active' : ''}`} onClick={() => setCurrentView('scan')}>
-            {editingId ? 'פתיחת בקבוק / עריכה' : 'סריקת יין'}
+            {editingId ? 'עריכת פרטים' : 'סריקת יין'}
           </div>
           <div className={`nav-item ${currentView === 'cellar' ? 'active' : ''}`} onClick={() => setCurrentView('cellar')}>
             המרתף שלנו
@@ -841,9 +858,12 @@ function App() {
                     <div style={{ marginBottom: '15px', color: '#9C898E', fontSize: '0.85rem' }}>
                       נוסף למערכת: {formatPerfectDate(wine.dateOpened)}
                     </div>
-                    <div style={{ display: 'flex', gap: '15px' }}>
-                      <button className="btn-pill-outline" onClick={() => startEdit(wine)} style={{ flex: 1 }}>{wine.bottleStatus === 'stored' ? 'פתיחת בקבוק' : 'עריכה'}</button>
-                      <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9' }}>מחיקה</button>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      {wine.bottleStatus === 'stored' && (
+                        <button className="btn-pill-primary" onClick={() => startEdit(wine)} style={{ flex: 2, padding: '10px', fontSize: '1.05rem' }}>פתיחת בקבוק</button>
+                      )}
+                      <button className="btn-pill-outline" onClick={() => startEdit(wine)} style={{ flex: 1, padding: '10px' }}>עריכה</button>
+                      <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9', padding: '10px' }}>מחיקה</button>
                     </div>
                   </div>
                 </div>
@@ -983,7 +1003,21 @@ function App() {
 
               {stats.graphData && stats.graphData.length > 0 && (
                 <div className="soft-card" style={{ padding: '30px', backgroundColor: '#FFFFFF', border: '1px solid #EFECE6' }}>
-                  <h3 className="serif-title" style={{ margin: '0 0 25px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>היסטוריית בקבוקים שנפתחו (לפי חודש)</h3>
+                  <h3 className="serif-title" style={{ margin: '0 0 15px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>היסטוריית בקבוקים שנפתחו</h3>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '25px' }}>
+                    <select 
+                      value={selectedGraphYear} 
+                      onChange={(e) => setSelectedGraphYear(Number(e.target.value))}
+                      className="filter-select"
+                      style={{ maxWidth: '180px', textAlign: 'center', fontWeight: 'bold' }}
+                    >
+                      {stats.availableYears && stats.availableYears.map(year => (
+                        <option key={year} value={year}>שנת {year}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div style={{ width: '100%', height: '250px' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={stats.graphData}>
