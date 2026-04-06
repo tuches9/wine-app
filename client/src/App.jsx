@@ -165,7 +165,8 @@ function App() {
 
   const startEdit = (wine) => {
     setEditingId(wine._id);
-    setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus || 'drank' });
+    // מעביר אוטומטית ללשונית "נפתח ונשתה" כדי שיהיה נוח להוסיף רשמי טעימה
+    setFormData({ ...initialFormState, ...wine, bottleStatus: 'drank' });
     setPreviewUrl(wine.imageUrl);
     setCurrentView('scan'); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
