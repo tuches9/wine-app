@@ -19,7 +19,6 @@ function App() {
   const [currentView, setCurrentView] = useState('scan'); 
   const [cellarTab, setCellarTab] = useState('drank'); 
   
-  // הגדרות סינון ומיון - ברירת המחדל היא תאריך טעימה כי הלשונית הראשונה היא היסטוריה
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('הכל');
   const [filterCountry, setFilterCountry] = useState('הכל');
@@ -143,7 +142,6 @@ function App() {
       if (response.ok) {
         setEditingId(null);
         
-        // מעדכן את הלשונית והסינון בהתאם לסטטוס ששמרנו הרגע
         const newTab = formData.bottleStatus === 'stored' ? 'stored' : 'drank';
         setCellarTab(newTab);
         setSortOption(newTab === 'stored' ? 'dateOpened_desc' : 'dateDrank_desc');
@@ -710,7 +708,7 @@ function App() {
               className={`cellar-tab ${cellarTab === 'drank' ? 'active' : ''}`}
               onClick={() => {
                 setCellarTab('drank');
-                setSortOption('dateDrank_desc'); // החלפת סינון אוטומטית לתאריך טעימה
+                setSortOption('dateDrank_desc'); 
               }}
             >
               היסטוריית טעימות ({stats ? stats.totalDrank : 0})
@@ -719,7 +717,7 @@ function App() {
               className={`cellar-tab ${cellarTab === 'stored' ? 'active' : ''}`}
               onClick={() => {
                 setCellarTab('stored');
-                setSortOption('dateOpened_desc'); // החלפת סינון אוטומטית לתאריך הוספה
+                setSortOption('dateOpened_desc'); 
               }}
             >
               האוסף הפרטי ({stats ? stats.totalStored : 0})
@@ -732,7 +730,7 @@ function App() {
               placeholder="חיפוש חופשי..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ flex: '1 1 200px', border: '1px solid #EAE6DF', backgroundColor: '#F8F7F5', outline: 'none', fontSize: '1rem', fontFamily: 'Assistant', padding: '12px', borderRadius: '12px' }}
+              style={{ flex: '1 1 200px', border: '1px solid #EAE6DF', backgroundColor: '#F8F7F5', color: '#332F2C', outline: 'none', fontSize: '1rem', fontFamily: 'Assistant', padding: '12px', borderRadius: '12px' }}
             />
             
             <select 
@@ -794,13 +792,20 @@ function App() {
                     {wine.rating && wine.bottleStatus === 'drank' && <span style={{ color: '#B49A65', fontSize: '1.2rem', fontWeight: 'bold' }}>{wine.rating} ★</span>}
                   </div>
                   
-                  <p style={{ color: '#7D736A', fontSize: '1rem', margin: '0 0 20px 0', letterSpacing: '0.5px' }}>
-                    {getCountryFlag(wine.country)} {wine.producer} {wine.vintage ? `| ${wine.vintage}` : ''} 
+                  <p style={{ color: '#7D736A', fontSize: '1rem', margin: '0 0 5px 0', letterSpacing: '0.5px' }}>
+                    {getCountryFlag(wine.country)} {wine.country}{wine.region ? ` (${wine.region})` : ''} • {wine.producer} {wine.vintage ? `• ${wine.vintage}` : ''} 
                   </p>
                   
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '25px' }}>
+                  {wine.grapes && (
+                    <p style={{ color: '#9C898E', fontSize: '0.95rem', margin: '0 0 20px 0' }}>
+                      זני ענבים: <span style={{fontWeight: '600', color: '#7D736A'}}>{wine.grapes}</span>
+                    </p>
+                  )}
+                  
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '25px', alignItems: 'center' }}>
                     <span style={{ ...typeStyle, padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>{wine.wineType}</span>
                     {wine.isNatural && <span style={{ color: '#4A5D23', backgroundColor: '#F3F6EB', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>טבעי</span>}
+                    {wine.price && <span style={{ color: '#572C3A', backgroundColor: '#EAE6DF', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>₪{wine.price}</span>}
                   </div>
 
                   {wine.bottleStatus === 'drank' && (
