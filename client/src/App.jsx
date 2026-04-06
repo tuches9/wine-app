@@ -165,7 +165,6 @@ function App() {
 
   const startEdit = (wine) => {
     setEditingId(wine._id);
-    // מעביר אוטומטית ללשונית "נפתח ונשתה" כדי שיהיה נוח להוסיף רשמי טעימה
     setFormData({ ...initialFormState, ...wine, bottleStatus: 'drank' });
     setPreviewUrl(wine.imageUrl);
     setCurrentView('scan'); 
@@ -570,7 +569,7 @@ function App() {
       <div className="nav-pill-container">
         <div className="nav-pill">
           <div className={`nav-item ${currentView === 'scan' ? 'active' : ''}`} onClick={() => setCurrentView('scan')}>
-            {editingId ? 'עריכה פעילה' : 'סריקת יין'}
+            {editingId ? 'פתיחת בקבוק / עריכה' : 'סריקת יין'}
           </div>
           <div className={`nav-item ${currentView === 'cellar' ? 'active' : ''}`} onClick={() => setCurrentView('cellar')}>
             המרתף שלנו
@@ -688,7 +687,7 @@ function App() {
 
               <div style={{ display: 'flex', gap: '15px', marginTop: '20px' }}>
                 <button className="btn-pill-primary" type="submit" disabled={isSaving || isAnalyzing} style={{ flex: 3 }}>
-                  {isSaving ? 'שומר...' : (editingId ? 'עדכון הרשומה' : 'הוספה למערכת')}
+                  {isSaving ? 'שומר...' : (editingId ? 'שמירת שינויים' : 'הוספה למערכת')}
                 </button>
                 {editingId && (
                   <button className="btn-pill-outline" type="button" onClick={() => {setEditingId(null); setFormData(initialFormState); setPreviewUrl(null); setCurrentView('cellar');}} style={{ flex: 1 }}>
@@ -843,7 +842,7 @@ function App() {
                       נוסף למערכת: {formatPerfectDate(wine.dateOpened)}
                     </div>
                     <div style={{ display: 'flex', gap: '15px' }}>
-                      <button className="btn-pill-outline" onClick={() => startEdit(wine)} style={{ flex: 1 }}>{wine.bottleStatus === 'stored' ? 'פתיחת הבקבוק' : 'עריכה'}</button>
+                      <button className="btn-pill-outline" onClick={() => startEdit(wine)} style={{ flex: 1 }}>{wine.bottleStatus === 'stored' ? 'פתיחת בקבוק' : 'עריכה'}</button>
                       <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9' }}>מחיקה</button>
                     </div>
                   </div>
