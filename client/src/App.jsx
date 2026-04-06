@@ -19,11 +19,11 @@ function App() {
   const [currentView, setCurrentView] = useState('scan'); 
   const [cellarTab, setCellarTab] = useState('drank'); 
   
-  // הגדרות סינון ומיון חדשות
+  // הגדרות סינון ומיון - ברירת המחדל היא תאריך טעימה כי הלשונית הראשונה היא היסטוריה
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('הכל');
   const [filterCountry, setFilterCountry] = useState('הכל');
-  const [sortOption, setSortOption] = useState('dateOpened_desc');
+  const [sortOption, setSortOption] = useState('dateDrank_desc');
 
   const API_BASE_URL = 'https://wine-app-server.onrender.com';
 
@@ -142,7 +142,12 @@ function App() {
       });
       if (response.ok) {
         setEditingId(null);
-        setCellarTab(formData.bottleStatus === 'stored' ? 'stored' : 'drank');
+        
+        // מעדכן את הלשונית והסינון בהתאם לסטטוס ששמרנו הרגע
+        const newTab = formData.bottleStatus === 'stored' ? 'stored' : 'drank';
+        setCellarTab(newTab);
+        setSortOption(newTab === 'stored' ? 'dateOpened_desc' : 'dateDrank_desc');
+        
         setFormData(initialFormState);
         setPreviewUrl(null);
         fetchWines(); 
@@ -209,7 +214,6 @@ function App() {
     return '';
   };
 
-  // מציאת כל המדינות הקיימות במרתף לטובת הסינון
   const uniqueCountries = ['הכל', ...new Set(winesList.map(w => w.country).filter(c => c && c.trim() !== ''))].sort();
 
   const calculateStats = () => {
@@ -292,7 +296,6 @@ function App() {
 
   const stats = calculateStats();
 
-  // מנגנון הסינון והמיון המעודכן
   const getSortedAndFilteredWines = () => {
     let result = winesList.filter(wine => {
       const isCorrectTab = (cellarTab === 'stored' && wine.bottleStatus === 'stored') || (cellarTab === 'drank' && wine.bottleStatus !== 'stored');
@@ -705,13 +708,19 @@ function App() {
           <div className="cellar-tabs">
             <div 
               className={`cellar-tab ${cellarTab === 'drank' ? 'active' : ''}`}
-              onClick={() => setCellarTab('drank')}
+              onClick={() => {
+                setCellarTab('drank');
+                setSortOption('dateDrank_desc'); // החלפת סינון אוטומטית לתאריך טעימה
+              }}
             >
               היסטוריית טעימות ({stats ? stats.totalDrank : 0})
             </div>
             <div 
               className={`cellar-tab ${cellarTab === 'stored' ? 'active' : ''}`}
-              onClick={() => setCellarTab('stored')}
+              onClick={() => {
+                setCellarTab('stored');
+                setSortOption('dateOpened_desc'); // החלפת סינון אוטומטית לתאריך הוספה
+              }}
             >
               האוסף הפרטי ({stats ? stats.totalStored : 0})
             </div>
@@ -753,8 +762,8 @@ function App() {
               onChange={(e) => setSortOption(e.target.value)}
               className="filter-select"
             >
-              <option value="dateOpened_desc">הכי חדש במערכת</option>
-              <option value="dateOpened_asc">הכי ישן במערכת</option>
+              <option value="dateOpened_desc">תאריך הוספה (חדש לישן)</option>
+              <option value="dateOpened_asc">תאריך הוספה (ישן לחדש)</option>
               {cellarTab === 'drank' && <option value="dateDrank_desc">תאריך טעימה (מהחדש לישן)</option>}
               {cellarTab === 'drank' && <option value="rating_desc">ציון (מהגבוה לנמוך)</option>}
               <option value="price_desc">מחיר (מהיקר לזול)</option>
