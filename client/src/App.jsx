@@ -24,7 +24,6 @@ function App() {
   const [filterCountry, setFilterCountry] = useState('הכל');
   const [sortOption, setSortOption] = useState('dateDrank_desc');
   
-  // State חדש לבחירת שנה בגרף
   const [selectedGraphYear, setSelectedGraphYear] = useState(new Date().getFullYear());
 
   const API_BASE_URL = 'https://wine-app-server.onrender.com';
@@ -166,9 +165,19 @@ function App() {
     } catch (error) { alert('שגיאה במחיקה.'); }
   };
 
-  const startEdit = (wine) => {
+  // פעולת פתיחת בקבוק - כופה מעבר לסטטוס 'drank'
+  const openBottle = (wine) => {
     setEditingId(wine._id);
-    setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus || 'drank' });
+    setFormData({ ...initialFormState, ...wine, bottleStatus: 'drank' });
+    setPreviewUrl(wine.imageUrl);
+    setCurrentView('scan'); 
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // פעולת עריכה רגילה - שומרת על הסטטוס הקיים של היין
+  const editWine = (wine) => {
+    setEditingId(wine._id);
+    setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus });
     setPreviewUrl(wine.imageUrl);
     setCurrentView('scan'); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -274,7 +283,6 @@ function App() {
       count: countryRatings[c].count
     })).sort((a,b) => b.avg - a.avg).slice(0, 5); 
 
-    // מציאת השנים הזמינות לגרף
     const yearsSet = new Set(drankWines.map(w => {
       const dStr = w.dateDrank || w.dateOpened;
       return dStr ? new Date(dStr).getFullYear() : null;
@@ -282,7 +290,6 @@ function App() {
     const availableYears = [...yearsSet].sort((a,b) => b - a);
     if (availableYears.length === 0) availableYears.push(new Date().getFullYear());
 
-    // ספירת חודשים עבור השנה הנבחרת בלבד
     const monthCounts = {};
     drankWines.forEach(w => {
       const dateStr = w.dateDrank || w.dateOpened;
@@ -295,7 +302,6 @@ function App() {
       }
     });
 
-    // בניית מערך מלא של כל חודשי השנה עבור השנה שנבחרה (כדי להציג גם 0)
     const hebrewMonths = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
     const graphData = hebrewMonths.map((monthName, index) => {
       const monthStr = String(index + 1).padStart(2, '0');
@@ -619,7 +625,7 @@ function App() {
                     className={`status-option ${formData.bottleStatus === 'drank' ? 'active' : ''}`}
                     onClick={() => handleStatusChange('drank')}
                   >
-                    נפתח ונשתה
+                    פתיחת בקבוק
                   </div>
                   <div 
                     className={`status-option ${formData.bottleStatus === 'stored' ? 'active' : ''}`}
@@ -860,9 +866,9 @@ function App() {
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
                       {wine.bottleStatus === 'stored' && (
-                        <button className="btn-pill-primary" onClick={() => startEdit(wine)} style={{ flex: 2, padding: '10px', fontSize: '1.05rem' }}>פתיחת בקבוק</button>
+                        <button className="btn-pill-primary" onClick={() => openBottle(wine)} style={{ flex: 2, padding: '10px', fontSize: '1.05rem' }}>פתיחת בקבוק</button>
                       )}
-                      <button className="btn-pill-outline" onClick={() => startEdit(wine)} style={{ flex: 1, padding: '10px' }}>עריכה</button>
+                      <button className="btn-pill-outline" onClick={() => editWine(wine)} style={{ flex: 1, padding: '10px' }}>עריכה</button>
                       <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9', padding: '10px' }}>מחיקה</button>
                     </div>
                   </div>
