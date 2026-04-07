@@ -219,6 +219,20 @@ function App() {
     if (name.includes('פורטוגל')) return '🇵🇹';
     if (name.includes('יוון')) return '🇬🇷';
     if (name.includes('אוסטריה')) return '🇦🇹';
+    // מדינות חדשות שנוספו
+    if (name.includes('מרוקו')) return '🇲🇦';
+    if (name.includes('לבנון')) return '🇱🇧';
+    if (name.includes('קפריסין')) return '🇨🇾';
+    if (name.includes('הונגריה')) return '🇭🇺';
+    if (name.includes('רומניה')) return '🇷🇴';
+    if (name.includes('בולגריה')) return '🇧🇬';
+    if (name.includes('מולדובה')) return '🇲🇩';
+    if (name.includes('קרואטיה')) return '🇭🇷';
+    if (name.includes('סלובניה')) return '🇸🇮';
+    if (name.includes('שוויץ') || name.includes('שווייץ')) return '🇨🇭';
+    if (name.includes('אורוגוואי') || name.includes('אורוגואי')) return '🇺🇾';
+    if (name.includes('אנגליה') || name.includes('בריטניה')) return '🇬🇧';
+    if (name.includes('קנדה')) return '🇨🇦';
     return '';
   };
 
@@ -239,7 +253,6 @@ function App() {
       return Object.keys(counts).length ? Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b) : '-';
     };
     
-    // מציאת הענב המוביל על ידי פיצול שמות הזנים (במידה ויש כמה מופרדים בפסיק או סלאש)
     const grapesList = winesList.flatMap(w => w.grapes ? w.grapes.split(/[,/]+/).map(g => g.trim()).filter(g => g !== '') : []);
     const topGrape = getMode(grapesList);
 
@@ -260,12 +273,28 @@ function App() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
 
-    const countryCounts = winesList.reduce((acc, w) => {
-      if(w.country && w.country.trim() !== '') acc[w.country] = (acc[w.country] || 0) + 1;
+    // עדכון החישוב: ספירת כמות היין שנשתה וכמות היין באוסף עבור כל מדינה
+    const countryStats = winesList.reduce((acc, w) => {
+      if(w.country && w.country.trim() !== '') {
+        const c = w.country.trim();
+        if(!acc[c]) acc[c] = { count: 0, drank: 0, stored: 0 };
+        acc[c].count += 1;
+        if(w.bottleStatus === 'stored') {
+          acc[c].stored += 1;
+        } else {
+          acc[c].drank += 1;
+        }
+      }
       return acc;
     }, {});
-    const topCountriesVolume = Object.keys(countryCounts)
-      .map(c => ({ name: c, count: countryCounts[c] }))
+
+    const topCountriesVolume = Object.keys(countryStats)
+      .map(c => ({ 
+        name: c, 
+        count: countryStats[c].count, 
+        drank: countryStats[c].drank, 
+        stored: countryStats[c].stored 
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
@@ -933,55 +962,56 @@ function App() {
                 </p>
               </div>
 
-              {/* 5 & 6. ממוצע ציונים וכמות יינות לפי מדינה */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
-                <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
-                  <div style={{ textAlign: 'center', marginBottom: '25px', paddingBottom: '20px', borderBottom: '1px solid #EAE6DF' }}>
-                    <span style={{ color: '#7D736A', fontSize: '1.1rem', display: 'block', marginBottom: '5px' }}>ממוצע הציונים הכללי</span>
-                    <span style={{ color: '#B49A65', fontSize: '3.5rem', fontWeight: 'bold', lineHeight: '1' }}>{stats.avgRating} <span style={{ fontSize: '1.5rem' }}>★</span></span>
+              {/* 5. ממוצע ציונים הכללי */}
+              <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
+                <div style={{ textAlign: 'center', marginBottom: '25px', paddingBottom: '20px', borderBottom: '1px solid #EAE6DF' }}>
+                  <span style={{ color: '#7D736A', fontSize: '1.1rem', display: 'block', marginBottom: '5px' }}>ממוצע הציונים הכללי</span>
+                  <span style={{ color: '#B49A65', fontSize: '3.5rem', fontWeight: 'bold', lineHeight: '1' }}>{stats.avgRating} <span style={{ fontSize: '1.5rem' }}>★</span></span>
+                </div>
+                
+                <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>ממוצע לפי מדינה</h3>
+                
+                {stats.countryAverages.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    {stats.countryAverages.map((country, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EFECE6', paddingBottom: '10px' }}>
+                        <span style={{ fontSize: '1.2rem', fontWeight: '600', color: '#332F2C' }}>
+                          {getCountryFlag(country.name)} {country.name}
+                        </span>
+                        <div style={{ textAlign: 'left' }}>
+                          <span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.2rem' }}>{country.avg} ★</span>
+                          <span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'block' }}>מתוך {country.count} יינות</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  
-                  <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>ממוצע לפי מדינה</h3>
-                  
-                  {stats.countryAverages.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                      {stats.countryAverages.map((country, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EFECE6', paddingBottom: '10px' }}>
-                          <span style={{ fontSize: '1.2rem', fontWeight: '600', color: '#332F2C' }}>
-                            {getCountryFlag(country.name)} {country.name}
-                          </span>
-                          <div style={{ textAlign: 'left' }}>
-                            <span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.2rem' }}>{country.avg} ★</span>
-                            <span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'block' }}>מתוך {country.count} יינות</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p style={{ color: '#7D736A', textAlign: 'center' }}>חסרים נתוני דירוג.</p>
-                  )}
-                </div>
+                ) : (
+                  <p style={{ color: '#7D736A', textAlign: 'center' }}>חסרים נתוני דירוג.</p>
+                )}
+              </div>
 
-                <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
-                  <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>כמות יינות לפי מדינה</h3>
-                  {stats.topCountriesVolume && stats.topCountriesVolume.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                      {stats.topCountriesVolume.map((country, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EFECE6', paddingBottom: '10px' }}>
-                          <span style={{ fontSize: '1.2rem', fontWeight: '600', color: '#332F2C' }}>
-                            {getCountryFlag(country.name)} {country.name}
+              {/* 6. כמות יינות לפי מדינה */}
+              <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
+                <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>כמות יינות לפי מדינה</h3>
+                {stats.topCountriesVolume && stats.topCountriesVolume.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    {stats.topCountriesVolume.map((country, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EFECE6', paddingBottom: '10px' }}>
+                        <span style={{ fontSize: '1.2rem', fontWeight: '600', color: '#332F2C' }}>
+                          {getCountryFlag(country.name)} {country.name}
+                        </span>
+                        <div style={{ textAlign: 'left', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                          <span style={{ color: '#BCAFA4', fontSize: '0.9rem' }}>
+                            ({country.drank} נשתו / {country.stored} באוסף)
                           </span>
-                          <div style={{ textAlign: 'left' }}>
-                            <span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.2rem' }}>{country.count}</span>
-                            <span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'inline-block', marginRight: '5px' }}>יינות</span>
-                          </div>
+                          <span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.3rem' }}>{country.count}</span>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p style={{ textAlign: 'center', color: '#7D736A' }}>טרם עודכן</p>
-                  )}
-                </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ textAlign: 'center', color: '#7D736A' }}>טרם עודכן</p>
+                )}
               </div>
 
               {/* 7 & 8. הענב המוביל והמקומות הפופולריים */}
