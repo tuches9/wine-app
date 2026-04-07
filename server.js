@@ -68,19 +68,21 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     const fileData = fs.readFileSync(req.file.path);
     const imageBase64 = { inlineData: { data: fileData.toString("base64"), mimeType: req.file.mimetype } };
 
-    // חזרנו לג'מיני 2.5 פלאש שלך, יחד עם מצב ה-JSON וללא חיפוש שובר-שרת
+    console.log("מתחבר למודל Gemini 1.5 Flash עם חיפוש בגוגל...");
+    
+    // מעבר ל-1.5 Flash עם כלי החיפוש - ללא אילוץ ה-JSON כדי למנוע קריסה
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json" }
+      model: "gemini-1.5-flash",
+      tools: [{ googleSearch: {} }] 
     });
     
-    // הפרומפט החדש: הופך אותו למומחה ליינות טבעיים שקורא את השוליים
+    // הפרומפט החדש שאומר למודל איך להתנהג ומה להחזיר
     const prompt = `
       You are an expert Sommelier and wine identifier. Analyze the provided image of a wine bottle.
       CRITICAL INSTRUCTIONS FOR HARD-TO-READ OR NATURAL WINE LABELS:
       1. Scan the ENTIRE image, especially the far edges of the label. Look for vertical text, fine print, or small logos.
-      2. Natural wines often have hand-drawn, artistic labels without clear text on the front. Use your internal knowledge base to identify the producer based on the art style, the cuvée name, or any fragments of text.
-      3. Extract 'name' and 'producer' accurately based on visual clues.
+      2. USE THE GOOGLE SEARCH TOOL to search for visual characteristics, producer name, or cuvée if the text is unclear.
+      3. Natural wines often have hand-drawn, artistic labels without clear text. If you suspect it's a natural wine based on the art style, use that context in your search.
       
       Return ONLY a JSON object with EXACTLY these keys. If you cannot find or deduce a value, return an empty string "" for text, or null for numbers:
       {
@@ -88,25 +90,31 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         "producer": "Exact Winery or Domaine name",
         "vintage": 2024,
         "country": "Country of origin (in Hebrew, e.g., 'צרפת')",
-        "region": "Specific wine region (in Hebrew, e.g., 'לואר')",
+        "region": "Specific wine region (in Hebrew, e.g., 'בורגון')",
         "grapes": "Grape varieties (in Hebrew)",
         "isNatural": true,
-        "wineType": "אדום, לבן, רוזה, or כתום",
+        "wineType": "אדום",
         "aiInsightsArray": [
           "Fascinating fact 1 about this producer or style (Hebrew)",
           "Fascinating fact 2 (Hebrew)",
-          "Fascinating fact 3 (Hebrew)"
+          "Any other interesting context from your search (Hebrew)"
         ]
       }
+      Do NOT include any markdown formatting like \`\`\`json. Just output the raw JSON.
     `;
 
-    console.log("שולח תמונה ל-Gemini 2.5 Flash...");
     const result = await model.generateContent([prompt, imageBase64]);
     const responseText = result.response.text();
-    console.log("התקבלה תשובה מהמודל, ממיר לנתונים...");
+    console.log("התקבלה תשובה מהמודל. מנקה וממיר ל-JSON...");
 
-    const cleanJsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-    const wineData = JSON.parse(cleanJsonString);
+    let wineData;
+    try {
+        const cleanJsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        wineData = JSON.parse(cleanJsonString);
+    } catch (parseError) {
+        console.error("❌ שגיאה בהמרת התשובה ל-JSON. התשובה שהתקבלה:", responseText);
+        throw new Error("Invalid JSON format from Gemini");
+    }
     
     if (wineData.aiInsightsArray && Array.isArray(wineData.aiInsightsArray)) {
         wineData.aiInsights = '• ' + wineData.aiInsightsArray.join('\n\n• ');
