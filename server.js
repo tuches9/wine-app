@@ -58,35 +58,39 @@ const wineSchema = new mongoose.Schema({
 const Wine = mongoose.model('Wine', wineSchema);
 
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
+  console.log("--- מתחיל פענוח תווית יין ---");
   try {
-    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+    if (!req.file) {
+      console.log("❌ שגיאה: לא התקבלה תמונה");
+      return res.status(400).json({ error: 'No image uploaded' });
+    }
 
     const fileData = fs.readFileSync(req.file.path);
     const imageBase64 = { inlineData: { data: fileData.toString("base64"), mimeType: req.file.mimetype } };
 
-    // חזרנו למודל היציב ולצורת העבודה הבטוחה
+    // חזרנו לג'מיני 2.5 פלאש שלך, יחד עם מצב ה-JSON וללא חיפוש שובר-שרת
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
       generationConfig: { responseMimeType: "application/json" }
     });
     
-    // השארנו את הפרומפט החדש והחכם!
+    // הפרומפט החדש: הופך אותו למומחה ליינות טבעיים שקורא את השוליים
     const prompt = `
-      You are an expert Sommelier. Analyze this wine label carefully.
-      CRITICAL INSTRUCTIONS:
+      You are an expert Sommelier and wine identifier. Analyze the provided image of a wine bottle.
+      CRITICAL INSTRUCTIONS FOR HARD-TO-READ OR NATURAL WINE LABELS:
       1. Scan the ENTIRE image, especially the far edges of the label. Look for vertical text, fine print, or small logos.
-      2. If it looks like a natural wine (artistic, drawn label), use your deep knowledge of natural wine producers to guess the wine based on the art style, even if text is unreadable.
-      3. For any text you do find, extract 'name' and 'producer' EXACTLY as they appear.
+      2. Natural wines often have hand-drawn, artistic labels without clear text on the front. Use your internal knowledge base to identify the producer based on the art style, the cuvée name, or any fragments of text.
+      3. Extract 'name' and 'producer' accurately based on visual clues.
       
-      Return a JSON object with EXACTLY these keys. If you cannot find a value, return an empty string "" for text, or null for numbers:
+      Return ONLY a JSON object with EXACTLY these keys. If you cannot find or deduce a value, return an empty string "" for text, or null for numbers:
       {
         "name": "Exact name of the wine/cuvée",
         "producer": "Exact Winery or Domaine name",
         "vintage": 2024,
         "country": "Country of origin (in Hebrew, e.g., 'צרפת')",
-        "region": "Specific wine region (in Hebrew, e.g., 'בורגון')",
+        "region": "Specific wine region (in Hebrew, e.g., 'לואר')",
         "grapes": "Grape varieties (in Hebrew)",
-        "isNatural": true or false,
+        "isNatural": true,
         "wineType": "אדום, לבן, רוזה, or כתום",
         "aiInsightsArray": [
           "Fascinating fact 1 about this producer or style (Hebrew)",
@@ -96,8 +100,11 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       }
     `;
 
+    console.log("שולח תמונה ל-Gemini 2.5 Flash...");
     const result = await model.generateContent([prompt, imageBase64]);
     const responseText = result.response.text();
+    console.log("התקבלה תשובה מהמודל, ממיר לנתונים...");
+
     const cleanJsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     const wineData = JSON.parse(cleanJsonString);
     
@@ -107,6 +114,7 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         wineData.aiInsights = '';
     }
 
+    console.log("מעלה תמונה לקלאודינרי...");
     const cloudinaryResponse = await cloudinary.uploader.upload(req.file.path, {
         folder: 'wine_cellar'
     });
@@ -116,13 +124,14 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       imageUrl: cloudinaryResponse.secure_url, 
       analyzedData: wineData
     });
+    console.log("--- פענוח הסתיים בהצלחה, שולח לאפליקציה ---");
 
   } catch (error) {
-    console.error("Analysis error:", error);
+    console.error("❌ שגיאה בפענוח השרת:", error.message || error);
     if (req.file && fs.existsSync(req.file.path)) {
        fs.unlinkSync(req.file.path);
     }
-    res.status(500).json({ error: 'Image analysis error' });
+    res.status(500).json({ error: 'Image analysis error', details: error.message });
   }
 });
 
