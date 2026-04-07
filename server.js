@@ -65,28 +65,40 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     const fileData = fs.readFileSync(req.file.path);
     const imageBase64 = { inlineData: { data: fileData.toString("base64"), mimeType: req.file.mimetype } };
 
+    // כאן שדרגנו למודל החזק יותר והפעלנו את החיפוש בגוגל
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-pro",
+      tools: [{ googleSearch: {} }],
       generationConfig: { responseMimeType: "application/json" }
     });
     
+    // אלו ההוראות החדשות שמלמדות אותו איך להתמודד עם תוויות קשות ויינות טבעיים
     const prompt = `
-      You are a master sommelier. Analyze this wine label.
-      CRITICAL INSTRUCTION: Extract the 'name' and 'producer' EXACTLY as they appear on the label. Do not correct spelling.
-      Write fascinating insights (3-4 sentences, in Hebrew) about the wine, the producer, the history, or the vintage. 
-      Return a JSON object with EXACTLY these keys:
+      You are an expert Sommelier and wine identifier. Analyze the provided image of a wine bottle.
+      Your goal is to extract as much accurate information as possible and return it strictly as a JSON object.
+
+      CRITICAL INSTRUCTIONS FOR HARD-TO-READ LABELS:
+      1. Scan the ENTIRE image, especially the far edges of the label. Look for vertical text, fine print, or import/export details.
+      2. If the front label is purely an illustration without text, USE THE GOOGLE SEARCH TOOL to search for the visual characteristics, producer name (if found on the edge), or any visible cuvée name.
+      3. Natural wines often have hand-drawn, artistic labels without clear text on the front. If you suspect it's a natural wine based on the art style, use that context in your search.
+      4. If you see a QR code, mention that in the insights, even if you can't scan it directly.
+
+      Return a JSON object with EXACTLY these keys. If you are entirely unsure about a field, return an empty string "" for text, or null for numbers, but try your absolute best to infer from the search:
       {
-        "name": "Exact name on label",
-        "producer": "Exact producer or domaine",
+        "name": "Exact name of the wine/cuvée",
+        "producer": "Exact Winery or Domaine name",
         "vintage": 2024,
         "country": "Country of origin (in Hebrew, e.g., 'צרפת')",
-        "region": "Region (in Hebrew, e.g., 'בורגון')",
+        "region": "Specific wine region (in Hebrew, e.g., 'בורגון')",
         "grapes": "Grape varieties (in Hebrew)",
         "isNatural": true or false,
-        "wineType": "אדום", "לבן", "כתום", or "רוזה",
-        "aiInsightsArray": ["First interesting fact...", "Second interesting fact...", "Third interesting fact..."]
+        "wineType": "אדום, לבן, רוזה, or כתום",
+        "aiInsightsArray": [
+          "A fascinating fact about this producer or wine style (Hebrew)",
+          "Information about the label art or the story behind the wine (Hebrew)",
+          "Any other interesting context from your search (Hebrew)"
+        ]
       }
-      If you absolutely cannot find or deduce a value, return an empty string "" for text, or null for numbers.
     `;
 
     const result = await model.generateContent([prompt, imageBase64]);
