@@ -7,18 +7,34 @@ const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cloudinary = require('cloudinary').v2;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.CLOUD_API_KEY,
-  api_secret: process.env.CLOUD_API_SECRET
-});
-
 const app = express();
+
+// 1. הגדרות בסיסיות (Middlewares)
 app.use(cors());
 app.use(express.json());
 
+// בדיקת חיות פשוטה ל-Render - סופר חשוב ל-Deploy תקין!
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
+// 2. בדיקה שהמפתחות בכלל קיימים - למנוע קריסה שקטה
+if (!process.env.GEMINI_API_KEY) {
+  console.warn("⚠️ אזהרה: מפתח Gemini חסר בהגדרות הסביבה!");
+}
+if (!process.env.CLOUD_NAME || !process.env.CLOUD_API_KEY) {
+  console.warn("⚠️ אזהרה: מפתחות Cloudinary חסרים בהגדרות הסביבה!");
+}
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key_to_prevent_crash_during_build');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME || 'dummy',
+  api_key: process.env.CLOUD_API_KEY || 'dummy',
+  api_secret: process.env.CLOUD_API_SECRET || 'dummy'
+});
+
+// 3. הגדרות העלאת קבצים
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) { fs.mkdirSync(uploadDir); }
 
@@ -28,11 +44,20 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+// 4. התחברות חכמה למונגו
 const mongoURI = 'mongodb+srv://ilay_admin:120766ely@cluster0.whmntq6.mongodb.net/?appName=Cluster0';
-mongoose.connect(mongoURI)
-  .then(() => console.log('Database connection successful!'))
-  .catch((err) => console.log('Database connection error:', err));
 
+// מגדירים שגם אם יש שגיאה בחיבור למונגו, השרת לא יקרוס
+mongoose.connect(mongoURI, {
+    serverSelectionTimeoutMS: 5000 // השרת לא יחכה למונגו יותר מ-5 שניות כדי לעלות
+})
+  .then(() => console.log('✅ חיבור למסד הנתונים הצליח!'))
+  .catch((err) => {
+      console.error('❌ שגיאה בחיבור למסד הנתונים:', err.message);
+      // השרת לא ייעצר כאן, הוא ימשיך לעלות כדי ש-Render לא יתקע
+  });
+
+// 5. סכמת נתונים
 const wineSchema = new mongoose.Schema({
   imageUrl: String,
   name: String,
@@ -57,6 +82,7 @@ const wineSchema = new mongoose.Schema({
 });
 const Wine = mongoose.model('Wine', wineSchema);
 
+// 6. נתיבי ה-API
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   console.log("--- מתחיל פענוח תווית יין ---");
   try {
@@ -70,13 +96,11 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
 
     console.log("מתחבר למודל Gemini 1.5 Flash עם חיפוש בגוגל...");
     
-    // מעבר ל-1.5 Flash עם כלי החיפוש - ללא אילוץ ה-JSON כדי למנוע קריסה
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
       tools: [{ googleSearch: {} }] 
     });
     
-    // הפרומפט החדש שאומר למודל איך להתנהג ומה להחזיר
     const prompt = `
       You are an expert Sommelier and wine identifier. Analyze the provided image of a wine bottle.
       CRITICAL INSTRUCTIONS FOR HARD-TO-READ OR NATURAL WINE LABELS:
@@ -180,5 +204,8 @@ app.put('/api/wines/:id', async (req, res) => {
   }
 });
 
+// 7. הרמת השרת בצורה תקינה ל-Render
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Smart server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 השרת רץ ומאזין על פורט ${PORT}`);
+});
