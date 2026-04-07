@@ -65,14 +65,12 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     const fileData = fs.readFileSync(req.file.path);
     const imageBase64 = { inlineData: { data: fileData.toString("base64"), mimeType: req.file.mimetype } };
 
-    // כאן שדרגנו למודל החזק יותר והפעלנו את החיפוש בגוגל
+    // התיקון כאן: הסרנו את ה-generationConfig שגרם להתנגשות עם מנוע החיפוש
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-pro",
-      tools: [{ googleSearch: {} }],
-      generationConfig: { responseMimeType: "application/json" }
+      tools: [{ googleSearch: {} }] 
     });
     
-    // אלו ההוראות החדשות שמלמדות אותו איך להתמודד עם תוויות קשות ויינות טבעיים
     const prompt = `
       You are an expert Sommelier and wine identifier. Analyze the provided image of a wine bottle.
       Your goal is to extract as much accurate information as possible and return it strictly as a JSON object.
@@ -103,6 +101,8 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
 
     const result = await model.generateContent([prompt, imageBase64]);
     const responseText = result.response.text();
+    
+    // מנקה את הטקסט כדי לוודא שזה JSON תקין
     const cleanJsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     const wineData = JSON.parse(cleanJsonString);
     
@@ -123,8 +123,12 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Analysis error:", error);
-    res.status(500).json({ error: 'Image analysis error' });
+    // הוספתי כאן הדפסה מפורטת יותר כדי שאם תהיה שוב שגיאה נדע בדיוק מה היא
+    console.error("Detailed analysis error:", error.message || error);
+    if (req.file && fs.existsSync(req.file.path)) {
+       fs.unlinkSync(req.file.path); // מנקה את הקובץ גם אם היתה שגיאה
+    }
+    res.status(500).json({ error: 'Image analysis error', details: error.message });
   }
 });
 
