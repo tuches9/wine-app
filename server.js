@@ -9,24 +9,15 @@ const cloudinary = require('cloudinary').v2;
 
 const app = express();
 
-// 1. הגדרות בסיסיות (Middlewares)
 app.use(cors());
 app.use(express.json());
 
-// בדיקת חיות פשוטה ל-Render - סופר חשוב ל-Deploy תקין!
+// נתיב חילוץ שמונע מ-Render להתקע ב-Deploy
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-// 2. בדיקה שהמפתחות בכלל קיימים - למנוע קריסה שקטה
-if (!process.env.GEMINI_API_KEY) {
-  console.warn("⚠️ אזהרה: מפתח Gemini חסר בהגדרות הסביבה!");
-}
-if (!process.env.CLOUD_NAME || !process.env.CLOUD_API_KEY) {
-  console.warn("⚠️ אזהרה: מפתחות Cloudinary חסרים בהגדרות הסביבה!");
-}
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key_to_prevent_crash_during_build');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key');
 
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME || 'dummy',
@@ -34,7 +25,6 @@ cloudinary.config({
   api_secret: process.env.CLOUD_API_SECRET || 'dummy'
 });
 
-// 3. הגדרות העלאת קבצים
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) { fs.mkdirSync(uploadDir); }
 
@@ -44,20 +34,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// 4. התחברות חכמה למונגו
 const mongoURI = 'mongodb+srv://ilay_admin:120766ely@cluster0.whmntq6.mongodb.net/?appName=Cluster0';
 
-// מגדירים שגם אם יש שגיאה בחיבור למונגו, השרת לא יקרוס
-mongoose.connect(mongoURI, {
-    serverSelectionTimeoutMS: 5000 // השרת לא יחכה למונגו יותר מ-5 שניות כדי לעלות
-})
+// התחברות למונגו עם טיימאאוט כדי לא לתקוע את השרת
+mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 5000 })
   .then(() => console.log('✅ חיבור למסד הנתונים הצליח!'))
-  .catch((err) => {
-      console.error('❌ שגיאה בחיבור למסד הנתונים:', err.message);
-      // השרת לא ייעצר כאן, הוא ימשיך לעלות כדי ש-Render לא יתקע
-  });
+  .catch((err) => console.error('❌ שגיאה בחיבור למסד הנתונים:', err.message));
 
-// 5. סכמת נתונים
 const wineSchema = new mongoose.Schema({
   imageUrl: String,
   name: String,
@@ -82,7 +65,6 @@ const wineSchema = new mongoose.Schema({
 });
 const Wine = mongoose.model('Wine', wineSchema);
 
-// 6. נתיבי ה-API
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   console.log("--- מתחיל פענוח תווית יין ---");
   try {
@@ -94,21 +76,22 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     const fileData = fs.readFileSync(req.file.path);
     const imageBase64 = { inlineData: { data: fileData.toString("base64"), mimeType: req.file.mimetype } };
 
-    console.log("מתחבר למודל Gemini 1.5 Flash עם חיפוש בגוגל...");
+    console.log("מתחבר למודל Gemini 2.5 Flash...");
     
+    // חזרנו למודל המנצח שלך עם אילוץ ה-JSON
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      tools: [{ googleSearch: {} }] 
+      model: "gemini-2.5-flash",
+      generationConfig: { responseMimeType: "application/json" }
     });
     
+    // הפרומפט החדש שלנו - המומחה ליינות טבעיים
     const prompt = `
       You are an expert Sommelier and wine identifier. Analyze the provided image of a wine bottle.
       CRITICAL INSTRUCTIONS FOR HARD-TO-READ OR NATURAL WINE LABELS:
       1. Scan the ENTIRE image, especially the far edges of the label. Look for vertical text, fine print, or small logos.
-      2. USE THE GOOGLE SEARCH TOOL to search for visual characteristics, producer name, or cuvée if the text is unclear.
-      3. Natural wines often have hand-drawn, artistic labels without clear text. If you suspect it's a natural wine based on the art style, use that context in your search.
+      2. Natural wines often have hand-drawn, artistic labels without clear text. If you suspect it's a natural wine based on the art style, use your deep internal knowledge base to identify the producer, cuvée, or region based on the visual clues.
       
-      Return ONLY a JSON object with EXACTLY these keys. If you cannot find or deduce a value, return an empty string "" for text, or null for numbers:
+      Return ONLY a valid JSON object with EXACTLY these keys. If you cannot find or deduce a value, return an empty string "" for text, or null for numbers. Do not include markdown:
       {
         "name": "Exact name of the wine/cuvée",
         "producer": "Exact Winery or Domaine name",
@@ -117,26 +100,24 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         "region": "Specific wine region (in Hebrew, e.g., 'בורגון')",
         "grapes": "Grape varieties (in Hebrew)",
         "isNatural": true,
-        "wineType": "אדום",
+        "wineType": "אדום, לבן, רוזה, or כתום",
         "aiInsightsArray": [
           "Fascinating fact 1 about this producer or style (Hebrew)",
-          "Fascinating fact 2 (Hebrew)",
-          "Any other interesting context from your search (Hebrew)"
+          "Fascinating fact 2 (Hebrew)"
         ]
       }
-      Do NOT include any markdown formatting like \`\`\`json. Just output the raw JSON.
     `;
 
     const result = await model.generateContent([prompt, imageBase64]);
     const responseText = result.response.text();
-    console.log("התקבלה תשובה מהמודל. מנקה וממיר ל-JSON...");
+    console.log("התקבלה תשובה מהמודל. ממיר ל-JSON...");
 
     let wineData;
     try {
         const cleanJsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
         wineData = JSON.parse(cleanJsonString);
     } catch (parseError) {
-        console.error("❌ שגיאה בהמרת התשובה ל-JSON. התשובה שהתקבלה:", responseText);
+        console.error("❌ שגיאה בהמרת התשובה ל-JSON. התשובה:", responseText);
         throw new Error("Invalid JSON format from Gemini");
     }
     
@@ -204,7 +185,6 @@ app.put('/api/wines/:id', async (req, res) => {
   }
 });
 
-// 7. הרמת השרת בצורה תקינה ל-Render
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 השרת רץ ומאזין על פורט ${PORT}`);
