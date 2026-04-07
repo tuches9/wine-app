@@ -12,7 +12,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// נתיב חילוץ שמונע מ-Render להתקע ב-Deploy
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
@@ -36,11 +35,11 @@ const upload = multer({ storage: storage });
 
 const mongoURI = 'mongodb+srv://ilay_admin:120766ely@cluster0.whmntq6.mongodb.net/?appName=Cluster0';
 
-// התחברות למונגו עם טיימאאוט כדי לא לתקוע את השרת
 mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 5000 })
   .then(() => console.log('✅ חיבור למסד הנתונים הצליח!'))
   .catch((err) => console.error('❌ שגיאה בחיבור למסד הנתונים:', err.message));
 
+// עדכון הסכמה: הוספנו את isGift
 const wineSchema = new mongoose.Schema({
   imageUrl: String,
   name: String,
@@ -52,6 +51,7 @@ const wineSchema = new mongoose.Schema({
   vintage: Number,
   isNatural: Boolean,
   price: Number,
+  isGift: { type: Boolean, default: false }, // השדה החדש למתנה
   dateOpened: { type: Date, default: Date.now },
   dateDrank: String,
   rating: Number,
@@ -69,22 +69,17 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
   console.log("--- מתחיל פענוח תווית יין ---");
   try {
     if (!req.file) {
-      console.log("❌ שגיאה: לא התקבלה תמונה");
       return res.status(400).json({ error: 'No image uploaded' });
     }
 
     const fileData = fs.readFileSync(req.file.path);
     const imageBase64 = { inlineData: { data: fileData.toString("base64"), mimeType: req.file.mimetype } };
 
-    console.log("מתחבר למודל Gemini 2.5 Flash...");
-    
-    // חזרנו למודל המנצח שלך עם אילוץ ה-JSON
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
       generationConfig: { responseMimeType: "application/json" }
     });
     
-    // הפרומפט החדש שלנו - המומחה ליינות טבעיים
     const prompt = `
       You are an expert Sommelier and wine identifier. Analyze the provided image of a wine bottle.
       CRITICAL INSTRUCTIONS FOR HARD-TO-READ OR NATURAL WINE LABELS:
@@ -110,14 +105,12 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
 
     const result = await model.generateContent([prompt, imageBase64]);
     const responseText = result.response.text();
-    console.log("התקבלה תשובה מהמודל. ממיר ל-JSON...");
-
+    
     let wineData;
     try {
         const cleanJsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
         wineData = JSON.parse(cleanJsonString);
     } catch (parseError) {
-        console.error("❌ שגיאה בהמרת התשובה ל-JSON. התשובה:", responseText);
         throw new Error("Invalid JSON format from Gemini");
     }
     
@@ -127,7 +120,6 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         wineData.aiInsights = '';
     }
 
-    console.log("מעלה תמונה לקלאודינרי...");
     const cloudinaryResponse = await cloudinary.uploader.upload(req.file.path, {
         folder: 'wine_cellar'
     });
@@ -137,10 +129,8 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       imageUrl: cloudinaryResponse.secure_url, 
       analyzedData: wineData
     });
-    console.log("--- פענוח הסתיים בהצלחה, שולח לאפליקציה ---");
 
   } catch (error) {
-    console.error("❌ שגיאה בפענוח השרת:", error.message || error);
     if (req.file && fs.existsSync(req.file.path)) {
        fs.unlinkSync(req.file.path);
     }

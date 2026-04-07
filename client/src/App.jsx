@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 function App() {
   const initialFormState = {
     name: '', producer: '', wineType: 'אדום', country: '', region: '', 
-    grapes: '', vintage: 2024, isNatural: false, price: '', rating: 5, 
+    grapes: '', vintage: 2024, isNatural: false, price: '', isGift: false, rating: 5, 
     location: '', drankWith: '', dateDrank: '', aiInsights: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
     bottleStatus: 'drank' 
   };
@@ -43,7 +43,14 @@ function App() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
+    setFormData(prev => {
+      const newData = { ...prev, [name]: type === 'checkbox' ? checked : value };
+      // אם סימנו שזה מתנה, נאפס את המחיר
+      if (name === 'isGift' && checked) {
+        newData.price = '';
+      }
+      return newData;
+    });
   };
 
   const handleStatusChange = (status) => {
@@ -219,7 +226,6 @@ function App() {
     if (name.includes('פורטוגל')) return '🇵🇹';
     if (name.includes('יוון')) return '🇬🇷';
     if (name.includes('אוסטריה')) return '🇦🇹';
-    // מדינות חדשות שנוספו
     if (name.includes('מרוקו')) return '🇲🇦';
     if (name.includes('לבנון')) return '🇱🇧';
     if (name.includes('קפריסין')) return '🇨🇾';
@@ -259,7 +265,8 @@ function App() {
     const validRatings = drankWines.filter(w => w.rating).map(w => Number(w.rating));
     const avgRating = validRatings.length ? (validRatings.reduce((a,b)=>a+b,0) / validRatings.length).toFixed(1) : '-';
 
-    const validPrices = winesList.filter(w => w.price).map(w => Number(w.price));
+    // חישוב ממוצע מחיר - מתעלם מיינות שסומנו כמתנה
+    const validPrices = winesList.filter(w => w.price && !w.isGift).map(w => Number(w.price));
     const avgPrice = validPrices.length ? Math.round(validPrices.reduce((a,b)=>a+b,0) / validPrices.length) : '-';
 
     const favoriteType = getMode(drankWines.map(w => w.wineType));
@@ -273,7 +280,6 @@ function App() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
 
-    // עדכון החישוב: ספירת כמות היין שנשתה וכמות היין באוסף עבור כל מדינה
     const countryStats = winesList.reduce((acc, w) => {
       if(w.country && w.country.trim() !== '') {
         const c = w.country.trim();
@@ -513,6 +519,12 @@ function App() {
       background-color: #FFFFFF;
       box-shadow: 0 0 0 2px #D3C3B0, inset 0 2px 5px rgba(0,0,0,0.01);
     }
+    
+    .soft-input:disabled {
+      background-color: #EAE6DF;
+      color: #9C898E;
+      cursor: not-allowed;
+    }
 
     .filter-panel {
       display: flex;
@@ -708,6 +720,27 @@ function App() {
                 </div>
               </div>
 
+              {/* בלוק חדש: מחיר ומתנה - עכשיו מופיע תמיד ומופרד מסטטוס השתייה */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '20px', backgroundColor: '#F8F7F5', borderRadius: '24px', marginTop: '10px' }}>
+                <div>
+                  <label style={labelStyle}>מחיר (₪)</label>
+                  <input 
+                    className="soft-input" 
+                    type="number" 
+                    name="price" 
+                    value={formData.price} 
+                    onChange={handleChange} 
+                    disabled={formData.isGift} 
+                    placeholder={formData.isGift ? "מתנה" : ""}
+                    style={{ backgroundColor: formData.isGift ? '#EAE6DF' : '#fff' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '28px' }}>
+                  <input type="checkbox" name="isGift" checked={formData.isGift} onChange={handleChange} style={{ width: '22px', height: '22px', accentColor: '#572C3A' }} />
+                  <label style={{ color: '#332F2C', fontWeight: '600', fontSize: '1.1rem' }}>התקבל במתנה</label>
+                </div>
+              </div>
+
               <div style={{ marginTop: '10px' }}>
                 <label style={{...labelStyle, color: '#B49A65', fontWeight: 'bold'}} className="serif-title">הסומלייה הדיגיטלי</label>
                 <textarea className="soft-input rtl-textarea" name="aiInsights" value={formData.aiInsights} onChange={handleChange} style={{ minHeight: '180px', lineHeight: '1.6', backgroundColor: '#FFFFFF', border: '1px solid #EAE6DF' }} />
@@ -717,14 +750,15 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', animation: 'fadeIn 0.4s ease' }}>
                   <div style={{ height: '1px', backgroundColor: '#EFECE6', margin: '10px 0' }}></div>
                   
-                  <div>
-                    <label style={labelStyle}>תאריך טעימה</label>
-                    <input className="soft-input" type="date" name="dateDrank" value={formData.dateDrank || ''} onChange={handleChange} />
-                  </div>
-
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div><label style={labelStyle}>ציון אישי (1-5)</label><input className="soft-input" type="number" step="0.1" name="rating" value={formData.rating} onChange={handleChange} /></div>
-                    <div><label style={labelStyle}>מחיר (₪)</label><input className="soft-input" type="number" name="price" value={formData.price} onChange={handleChange} /></div>
+                    <div>
+                      <label style={labelStyle}>תאריך טעימה</label>
+                      <input className="soft-input" type="date" name="dateDrank" value={formData.dateDrank || ''} onChange={handleChange} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>ציון אישי (1-5)</label>
+                      <input className="soft-input" type="number" step="0.1" name="rating" value={formData.rating} onChange={handleChange} />
+                    </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
@@ -864,7 +898,11 @@ function App() {
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '25px', alignItems: 'center' }}>
                     <span style={{ ...typeStyle, padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>{wine.wineType}</span>
                     {wine.isNatural && <span style={{ color: '#4A5D23', backgroundColor: '#F3F6EB', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>טבעי</span>}
-                    {wine.price && <span style={{ color: '#572C3A', backgroundColor: '#EAE6DF', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>₪{wine.price}</span>}
+                    {wine.isGift ? (
+                      <span style={{ color: '#572C3A', backgroundColor: '#EAE6DF', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>מתנה</span>
+                    ) : wine.price ? (
+                      <span style={{ color: '#572C3A', backgroundColor: '#EAE6DF', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>₪{wine.price}</span>
+                    ) : null}
                   </div>
 
                   {wine.bottleStatus === 'drank' && (
@@ -950,7 +988,7 @@ function App() {
                 </div>
                 <div className="stat-card">
                   <span style={{ color: '#B49A65', fontSize: '2.5rem', fontWeight: 'bold', lineHeight: '1' }}>₪{stats.avgPrice}</span>
-                  <span style={{ color: '#7D736A', fontSize: '1.1rem', marginTop: '10px' }}>מחיר ממוצע</span>
+                  <span style={{ color: '#7D736A', fontSize: '1.1rem', marginTop: '10px' }}>מחיר ממוצע (ללא מתנות)</span>
                 </div>
               </div>
 
