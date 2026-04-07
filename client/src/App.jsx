@@ -165,7 +165,6 @@ function App() {
     } catch (error) { alert('שגיאה במחיקה.'); }
   };
 
-  // פעולת פתיחת בקבוק - כופה מעבר לסטטוס 'drank'
   const openBottle = (wine) => {
     setEditingId(wine._id);
     setFormData({ ...initialFormState, ...wine, bottleStatus: 'drank' });
@@ -174,7 +173,6 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // פעולת עריכה רגילה - שומרת על הסטטוס הקיים של היין
   const editWine = (wine) => {
     setEditingId(wine._id);
     setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus });
@@ -231,11 +229,19 @@ function App() {
 
     const drankWines = winesList.filter(w => w.bottleStatus !== 'stored');
     const storedWines = winesList.filter(w => w.bottleStatus === 'stored');
+    
+    const totalWines = winesList.length;
+    const naturalDrankCount = drankWines.filter(w => w.isNatural).length;
+    const naturalDrankPercentage = drankWines.length > 0 ? Math.round((naturalDrankCount / drankWines.length) * 100) : 0;
 
     const getMode = (arr) => {
       const counts = arr.reduce((acc, val) => { if(val && val.trim() !== '') acc[val] = (acc[val] || 0) + 1; return acc; }, {});
       return Object.keys(counts).length ? Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b) : '-';
     };
+    
+    // מציאת הענב המוביל על ידי פיצול שמות הזנים (במידה ויש כמה מופרדים בפסיק או סלאש)
+    const grapesList = winesList.flatMap(w => w.grapes ? w.grapes.split(/[,/]+/).map(g => g.trim()).filter(g => g !== '') : []);
+    const topGrape = getMode(grapesList);
 
     const validRatings = drankWines.filter(w => w.rating).map(w => Number(w.rating));
     const avgRating = validRatings.length ? (validRatings.reduce((a,b)=>a+b,0) / validRatings.length).toFixed(1) : '-';
@@ -253,8 +259,6 @@ function App() {
       .map(loc => ({ name: loc, count: locationCounts[loc] }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
-
-    const topLocation = topLocations.length > 0 ? topLocations[0].name : '-';
 
     const countryCounts = winesList.reduce((acc, w) => {
       if(w.country && w.country.trim() !== '') acc[w.country] = (acc[w.country] || 0) + 1;
@@ -312,7 +316,10 @@ function App() {
       };
     });
 
-    return { totalDrank: drankWines.length, totalStored: storedWines.length, avgRating, avgPrice, favoriteType, topLocations, topLocation, topCountriesVolume, topCountry, bestWine, countryAverages, graphData, availableYears };
+    return { 
+        totalWines, totalDrank: drankWines.length, totalStored: storedWines.length, naturalDrankCount, naturalDrankPercentage, topGrape,
+        avgRating, avgPrice, favoriteType, topLocations, topCountriesVolume, topCountry, bestWine, countryAverages, graphData, availableYears 
+    };
   };
 
   const stats = calculateStats();
@@ -885,15 +892,29 @@ function App() {
           
           {stats ? (
             <>
+              {/* 1. סה"כ יינות - חלוקה - טבעי */}
+              <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6', textAlign: 'center' }}>
+                <h3 className="serif-title" style={{ margin: '0 0 10px 0', fontSize: '1.5rem', color: '#572C3A' }}>סה״כ יינות במערכת</h3>
+                <span style={{ color: '#B49A65', fontSize: '4.5rem', fontWeight: 'bold', lineHeight: '1', display: 'block', marginBottom: '25px' }}>{stats.totalWines}</span>
+                
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', flexWrap: 'wrap', borderTop: '1px solid #EAE6DF', paddingTop: '25px' }}>
+                  <div style={{ flex: '1', minWidth: '120px' }}>
+                    <span style={{ color: '#572C3A', fontSize: '2.2rem', fontWeight: 'bold', display: 'block' }}>{stats.totalDrank}</span>
+                    <span style={{ color: '#7D736A', fontSize: '1rem' }}>נפתחו ונשתו</span>
+                  </div>
+                  <div style={{ flex: '1', minWidth: '120px', borderRight: '1px solid #EAE6DF', borderLeft: '1px solid #EAE6DF', padding: '0 15px' }}>
+                    <span style={{ color: '#B49A65', fontSize: '2.2rem', fontWeight: 'bold', display: 'block' }}>{stats.totalStored}</span>
+                    <span style={{ color: '#7D736A', fontSize: '1rem' }}>שוכבים באוסף</span>
+                  </div>
+                  <div style={{ flex: '1', minWidth: '120px' }}>
+                    <span style={{ color: '#4A5D23', fontSize: '2.2rem', fontWeight: 'bold', display: 'block' }}>{stats.naturalDrankCount}</span>
+                    <span style={{ color: '#7D736A', fontSize: '1rem' }}>יינות טבעיים שנשתו ({stats.naturalDrankPercentage}%)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2 & 3. סוג היין המועדף ומחיר ממוצע */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-                <div className="stat-card">
-                  <span style={{ color: '#572C3A', fontSize: '3rem', fontWeight: 'bold', lineHeight: '1' }}>{stats.totalDrank}</span>
-                  <span style={{ color: '#7D736A', fontSize: '1.1rem', marginTop: '10px' }}>נפתחו ונשתו</span>
-                </div>
-                <div className="stat-card">
-                  <span style={{ color: '#B49A65', fontSize: '3rem', fontWeight: 'bold', lineHeight: '1' }}>{stats.totalStored}</span>
-                  <span style={{ color: '#7D736A', fontSize: '1.1rem', marginTop: '10px' }}>שוכבים באוסף</span>
-                </div>
                 <div className="stat-card">
                   <span style={{ color: '#572C3A', fontSize: '2.5rem', fontWeight: 'bold', lineHeight: '1' }}>{stats.favoriteType || '-'}</span>
                   <span style={{ color: '#7D736A', fontSize: '1.1rem', marginTop: '10px' }}>הסוג המועדף</span>
@@ -904,19 +925,15 @@ function App() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-                <div className="soft-card" style={{ padding: '25px', textAlign: 'center', border: '1px solid #EFECE6' }}>
-                  <p style={{ margin: '0 0 5px 0', color: '#7D736A', fontSize: '1.1rem' }}>המדינה המובילה באוסף</p>
-                  <p className="serif-title" style={{ margin: 0, fontSize: '1.8rem', color: '#572C3A', fontWeight: 'bold' }}>
-                    {getCountryFlag(stats.topCountry)} {stats.topCountry || 'טרם עודכן'}
-                  </p>
-                </div>
-                <div className="soft-card" style={{ padding: '25px', textAlign: 'center', border: '1px solid #EFECE6' }}>
-                  <p style={{ margin: '0 0 5px 0', color: '#7D736A', fontSize: '1.1rem' }}>המקום הפופולרי ביותר לשתייה</p>
-                  <p className="serif-title" style={{ margin: 0, fontSize: '1.8rem', color: '#572C3A', fontWeight: 'bold' }}>{stats.topLocation || 'טרם עודכן'}</p>
-                </div>
+              {/* 4. המדינה המובילה */}
+              <div className="soft-card" style={{ padding: '25px', textAlign: 'center', border: '1px solid #EFECE6' }}>
+                <p style={{ margin: '0 0 5px 0', color: '#7D736A', fontSize: '1.1rem' }}>המדינה המובילה באוסף</p>
+                <p className="serif-title" style={{ margin: 0, fontSize: '1.8rem', color: '#572C3A', fontWeight: 'bold' }}>
+                  {getCountryFlag(stats.topCountry)} {stats.topCountry || 'טרם עודכן'}
+                </p>
               </div>
 
+              {/* 5 & 6. ממוצע ציונים וכמות יינות לפי מדינה */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
                 <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
                   <div style={{ textAlign: 'center', marginBottom: '25px', paddingBottom: '20px', borderBottom: '1px solid #EAE6DF' }}>
@@ -967,28 +984,15 @@ function App() {
                 </div>
               </div>
 
+              {/* 7 & 8. הענב המוביל והמקומות הפופולריים */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
-                {stats.bestWine ? (
-                  <div className="soft-card" style={{ padding: '30px', backgroundColor: '#FDFBF7', border: '1px solid #EFECE6', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <h3 className="serif-title" style={{ color: '#572C3A', margin: '0 0 20px 0', fontSize: '1.5rem', textAlign: 'center' }}>🏆 יין הדגל</h3>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                      {stats.bestWine.imageUrl && <img src={stats.bestWine.imageUrl} style={{ height: '140px', width: '90px', objectFit: 'cover', borderRadius: '12px', border: '1px solid #EAE6DF', boxShadow: '0 5px 15px rgba(0,0,0,0.05)' }} />}
-                      <div>
-                        <h4 className="serif-title" style={{ margin: '0 0 5px 0', fontSize: '1.3rem', color: '#332F2C', lineHeight: '1.2' }}>{stats.bestWine.name}</h4>
-                        <p style={{ margin: '0 0 15px 0', color: '#7D736A', fontSize: '0.95rem' }}>{getCountryFlag(stats.bestWine.country)} {stats.bestWine.producer} {stats.bestWine.vintage ? `| ${stats.bestWine.vintage}` : ''}</p>
-                        <span style={{ backgroundColor: '#572C3A', color: 'white', padding: '6px 16px', borderRadius: '50px', fontWeight: 'bold', fontSize: '1rem' }}>ציון: {stats.bestWine.rating} ★</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="soft-card" style={{ padding: '30px', backgroundColor: '#FDFBF7', border: '1px solid #EFECE6', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-                     <h3 className="serif-title" style={{ color: '#572C3A', margin: '0 0 10px 0', fontSize: '1.5rem', textAlign: 'center' }}>🏆 יין הדגל</h3>
-                     <p style={{ color: '#7D736A' }}>דרגו יינות כדי לראות את יין הדגל.</p>
-                  </div>
-                )}
+                <div className="soft-card" style={{ padding: '30px', textAlign: 'center', border: '1px solid #EFECE6', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <p style={{ margin: '0 0 15px 0', color: '#7D736A', fontSize: '1.2rem' }}>הענב המוביל</p>
+                    <p className="serif-title" style={{ margin: 0, fontSize: '2.5rem', color: '#572C3A', fontWeight: 'bold' }}>{stats.topGrape || '-'}</p>
+                </div>
 
                 <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
-                  <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>המקומות הפופולריים ביותר</h3>
+                  <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>המקומות הפופולריים לשתייה</h3>
                   {stats.topLocations && stats.topLocations.length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                       {stats.topLocations.map((loc, idx) => (
@@ -1007,6 +1011,29 @@ function App() {
                 </div>
               </div>
 
+              {/* 9. יין הדגל */}
+              <div>
+                {stats.bestWine ? (
+                  <div className="soft-card" style={{ padding: '30px', backgroundColor: '#FDFBF7', border: '1px solid #EFECE6', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <h3 className="serif-title" style={{ color: '#572C3A', margin: '0 0 20px 0', fontSize: '1.5rem', textAlign: 'center' }}>🏆 יין הדגל</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                      {stats.bestWine.imageUrl && <img src={stats.bestWine.imageUrl} style={{ height: '140px', width: '90px', objectFit: 'cover', borderRadius: '12px', border: '1px solid #EAE6DF', boxShadow: '0 5px 15px rgba(0,0,0,0.05)' }} />}
+                      <div>
+                        <h4 className="serif-title" style={{ margin: '0 0 5px 0', fontSize: '1.3rem', color: '#332F2C', lineHeight: '1.2' }}>{stats.bestWine.name}</h4>
+                        <p style={{ margin: '0 0 15px 0', color: '#7D736A', fontSize: '0.95rem' }}>{getCountryFlag(stats.bestWine.country)} {stats.bestWine.producer} {stats.bestWine.vintage ? `| ${stats.bestWine.vintage}` : ''}</p>
+                        <span style={{ backgroundColor: '#572C3A', color: 'white', padding: '6px 16px', borderRadius: '50px', fontWeight: 'bold', fontSize: '1rem' }}>ציון: {stats.bestWine.rating} ★</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="soft-card" style={{ padding: '30px', backgroundColor: '#FDFBF7', border: '1px solid #EFECE6', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                     <h3 className="serif-title" style={{ color: '#572C3A', margin: '0 0 10px 0', fontSize: '1.5rem', textAlign: 'center' }}>🏆 יין הדגל</h3>
+                     <p style={{ color: '#7D736A' }}>דרגו יינות כדי לראות את יין הדגל.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 10. הגרף של היסטוריית שתייה */}
               {stats.graphData && stats.graphData.length > 0 && (
                 <div className="soft-card" style={{ padding: '30px', backgroundColor: '#FFFFFF', border: '1px solid #EFECE6' }}>
                   <h3 className="serif-title" style={{ margin: '0 0 15px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>היסטוריית בקבוקים שנפתחו</h3>
