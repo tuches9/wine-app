@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import heic2any from 'heic2any'
-// עדכנו את הייבוא כדי לכלול את רכיבי גרף הרדאר
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 function App() {
@@ -9,7 +8,6 @@ function App() {
     grapes: '', vintage: 2024, isNatural: false, price: '', isGift: false, rating: 5, 
     location: '', drankWith: '', dateDrank: '', aiInsights: '', drinkWindow: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
     bottleStatus: 'drank',
-    // ערכי ברירת המחדל החדשים לפרופיל הטעם
     acidity: 1, sweetness: 1, body: 1, tannins: 1, alcohol: 1 
   };
 
@@ -47,7 +45,6 @@ function App() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => {
-      // עבור סליידרים של פרופיל טעם, נמיר את הערך למספר
       const isProfileField = ['acidity', 'sweetness', 'body', 'tannins', 'alcohol'].includes(name);
       const newData = { ...prev, [name]: type === 'checkbox' ? checked : (isProfileField ? Number(value) : value) };
       if (name === 'isGift' && checked) {
@@ -186,7 +183,6 @@ function App() {
 
   const editWine = (wine) => {
     setEditingId(wine._id);
-    // ודא שכל ערכי פרופיל הטעם מומרים למספרים
     setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus, acidity: Number(wine.acidity) || 1, sweetness: Number(wine.sweetness) || 1, body: Number(wine.body) || 1, tannins: Number(wine.tannins) || 1, alcohol: Number(wine.alcohol) || 1 });
     setPreviewUrl(wine.imageUrl);
     setCurrentView('scan'); 
@@ -230,7 +226,7 @@ function App() {
     if (name.includes('אוסטרליה')) return '🇦🇺';
     if (name.includes('פורטוגל')) return '🇵🇹';
     if (name.includes('יוון')) return '🇬🇷';
-    if (name.includes('אוסטריה')) return '🇦תוו';
+    if (name.includes('אוסטריה')) return '🇦🇹'; // כאן תיקנו את הדגל
     if (name.includes('מרוקו')) return '🇲🇦';
     if (name.includes('לבנון')) return '🇱🇧';
     if (name.includes('קפריסין')) return '🇨🇾';
@@ -631,7 +627,6 @@ function App() {
       unicode-bidi: plaintext;
     }
     
-    /* סגנונות חדשים עבור סליידרים של פרופיל טעם */
     .profile-slider {
       width: 100%;
       height: 10px;
@@ -778,7 +773,6 @@ function App() {
                 <textarea className="soft-input rtl-textarea" name="aiInsights" value={formData.aiInsights} onChange={handleChange} style={{ minHeight: '180px', lineHeight: '1.6', backgroundColor: '#FFFFFF', border: '1px solid #EAE6DF' }} />
               </div>
 
-              {/* אזור עריכת פרופיל טעם חדש */}
               <div style={{ marginTop: '20px', padding: '30px', backgroundColor: '#FDFBF7', borderRadius: '24px', border: '1px solid #EFECE6' }}>
                 <h3 className="serif-title" style={{ color: '#572C3A', margin: '0 0 25px 0', fontSize: '1.5rem', textAlign: 'center' }}>פרופיל טעם (כיול ידני)</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -930,13 +924,15 @@ function App() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '35px' }}>
             {sortedAndFilteredWines.map((wine) => {
               const typeStyle = getWineTypeStyle(wine.wineType);
-              // הכנת נתונים עבור גרף הרדאר
+              
+              // הפיכת הטקסט עבור ה-SVG כדי שיציג עברית כמו שצריך (תיקון של 'לוהוכלא' וכו')
+              const reverseHebrew = (str) => str.split('').reverse().join('');
               const radarData = [
-                { subject: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
-                { subject: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
-                { subject: 'גוף', A: Number(wine.body) || 1, fullMark: 5 },
-                { subject: 'טאנינים', A: Number(wine.tannins) || 1, fullMark: 5 },
-                { subject: 'אלכוהול', A: Number(wine.alcohol) || 1, fullMark: 5 },
+                { subject: reverseHebrew('חומציות'), originalName: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
+                { subject: reverseHebrew('מתיקות'), originalName: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
+                { subject: reverseHebrew('גוף'), originalName: 'גוף', A: Number(wine.body) || 1, fullMark: 5 },
+                { subject: reverseHebrew('טאנינים'), originalName: 'טאנינים', A: Number(wine.tannins) || 1, fullMark: 5 },
+                { subject: reverseHebrew('אלכוהול'), originalName: 'אלכוהול', A: Number(wine.alcohol) || 1, fullMark: 5 },
               ];
               
               return (
@@ -989,13 +985,19 @@ function App() {
                     ) : null}
                   </div>
 
-                  {/* הצגת גרף הרדאר של פרופיל הטעם */}
+                  {/* הגרף המעודכן עם תמיכה ב-Tooltip וטקסט מתוקן */}
                   <div style={{ marginBottom: '30px', padding: '10px', backgroundColor: '#FFFFFF', borderRadius: '20px', display: 'flex', justifyContent: 'center' }}>
                     <ResponsiveContainer width="100%" height={220}>
                       <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                         <PolarGrid stroke="#EAE6DF" />
-                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} />
+                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#7D736A', fontSize: 13, fontFamily: 'Assistant', fontWeight: 'bold' }} />
                         <PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false} />
+                        <Tooltip 
+                          formatter={(value) => [value, 'דירוג']}
+                          labelFormatter={(label, payload) => payload?.[0]?.payload?.originalName || label}
+                          contentStyle={{ backgroundColor: '#FDFBF7', border: '1px solid #EAE6DF', borderRadius: '8px', color: '#332F2C', direction: 'rtl', fontFamily: 'Assistant' }}
+                          itemStyle={{ color: '#572C3A', fontWeight: 'bold' }}
+                        />
                         <Radar name="פרופיל טעם" dataKey="A" stroke="#572C3A" fill="#572C3A" fillOpacity={0.2} dot={{ r: 4, fill: '#572C3A', stroke: '#FFFFFF', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#B49A65', stroke: '#FFFFFF' }} />
                       </RadarChart>
                     </ResponsiveContainer>
