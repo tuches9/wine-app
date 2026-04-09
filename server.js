@@ -57,13 +57,80 @@ const wineSchema = new mongoose.Schema({
   location: String,
   drankWith: String,
   aiInsights: String, 
-  drinkWindow: String, // השדה החדש שהוספנו
+  drinkWindow: String,
   tastingNotes: String,
   memory: String,
   additionalNotes: String,
   bottleStatus: { type: String, default: 'drank' } 
 });
 const Wine = mongoose.model('Wine', wineSchema);
+
+// --- הפונקציה החדשה לעדכון אוטומטי של המרתף ---
+app.get('/api/magic-update-windows', async (req, res) => {
+  console.log("--- מתחיל עדכון רטרואקטיבי לחלונות שתייה ---");
+  try {
+    // מוצא את כל היינות שאין להם עדיין חלון שתייה מוגדר
+    const winesToUpdate = await Wine.find({ 
+        $or: [ { drinkWindow: { $exists: false } }, { drinkWindow: "" } ] 
+    });
+
+    if (winesToUpdate.length === 0) {
+      return res.send('<h1 dir="rtl" style="text-align:center; color:#572C3A; font-family:sans-serif; margin-top:50px;">הכל כבר מעודכן! אין יינות שחסר להם חלון שתייה. 🍷</h1>');
+    }
+
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      generationConfig: { responseMimeType: "application/json" }
+    });
+
+    let updatedCount = 0;
+
+    for (let wine of winesToUpdate) {
+      try {
+        // בונים פרומפט קצרצר שמשתמש רק בטקסט הקיים במסד הנתונים
+        const prompt = `
+          You are an expert Sommelier. Estimate the optimal drinking window for this exact wine.
+          Name: ${wine.name || 'Unknown'}
+          Producer: ${wine.producer || 'Unknown'}
+          Vintage: ${wine.vintage || 'Unknown'}
+          Type: ${wine.wineType || 'Unknown'}
+          Grapes: ${wine.grapes || 'Unknown'}
+          Region: ${wine.region || 'Unknown'}, ${wine.country || 'Unknown'}
+          
+          Keep it concise in Hebrew (e.g., '2024-2028', 'מוכן לשתייה עכשיו', or 'לשמור עוד 3 שנים').
+          Return ONLY a valid JSON object. Do not include markdown:
+          { "drinkWindow": "Estimated drinking window in Hebrew" }
+        `;
+
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+        
+        const cleanJsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const aiData = JSON.parse(cleanJsonString);
+
+        if (aiData.drinkWindow) {
+          wine.drinkWindow = aiData.drinkWindow;
+          await wine.save();
+          updatedCount++;
+          console.log(`✅ עודכן בהצלחה: ${wine.name} -> ${wine.drinkWindow}`);
+        }
+
+        // המתנה קצרה של שניה וחצי בין יין ליין כדי לא להעמיס על ה-API של גוגל
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+      } catch (err) {
+        console.error(`❌ שגיאה בעדכון היין ${wine.name}:`, err.message);
+      }
+    }
+
+    res.send(`<h1 dir="rtl" style="text-align:center; color:#4A5D23; font-family:sans-serif; margin-top:50px;">הקסם עבד! ✨ <br> עברנו על ${updatedCount} יינות והוספנו להם חלון שתייה. אפשר לחזור לאפליקציה.</h1>`);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('<h1 dir="rtl" style="text-align:center; color:red; font-family:sans-serif; margin-top:50px;">קרתה שגיאה בתהליך. בדוק את ה-Logs ב-Render.</h1>');
+  }
+});
+// ---------------------------------------------------
 
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   console.log("--- מתחיל פענוח תווית יין ---");
