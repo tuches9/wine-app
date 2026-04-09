@@ -39,7 +39,6 @@ mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 5000 })
   .then(() => console.log('✅ חיבור למסד הנתונים הצליח!'))
   .catch((err) => console.error('❌ שגיאה בחיבור למסד הנתונים:', err.message));
 
-// עדכון הסכמה: הוספנו את isGift
 const wineSchema = new mongoose.Schema({
   imageUrl: String,
   name: String,
@@ -51,7 +50,7 @@ const wineSchema = new mongoose.Schema({
   vintage: Number,
   isNatural: Boolean,
   price: Number,
-  isGift: { type: Boolean, default: false }, // השדה החדש למתנה
+  isGift: { type: Boolean, default: false },
   dateOpened: { type: Date, default: Date.now },
   dateDrank: String,
   rating: Number,
@@ -166,9 +165,14 @@ app.delete('/api/wines/:id', async (req, res) => {
   }
 });
 
+// כאן בוצע התיקון שהחליף את הפקודה הישנה בפקודה החדשה
 app.put('/api/wines/:id', async (req, res) => {
   try {
-    const updatedWine = await Wine.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updatedWine = await Wine.findByIdAndUpdate(
+      req.params.id, 
+      req.body, 
+      { returnDocument: 'after' } 
+    );
     res.json(updatedWine);
   } catch (err) {
     res.status(500).json({ error: 'Error updating wine' });
