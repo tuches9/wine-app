@@ -6,7 +6,7 @@ function App() {
   const initialFormState = {
     name: '', producer: '', wineType: 'אדום', country: '', region: '', 
     grapes: '', vintage: 2024, isNatural: false, price: '', isGift: false, rating: 5, 
-    location: '', drankWith: '', dateDrank: '', aiInsights: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
+    location: '', drankWith: '', dateDrank: '', aiInsights: '', drinkWindow: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
     bottleStatus: 'drank' 
   };
 
@@ -45,7 +45,6 @@ function App() {
     const { name, value, type, checked } = e.target;
     setFormData(prev => {
       const newData = { ...prev, [name]: type === 'checkbox' ? checked : value };
-      // אם סימנו שזה מתנה, נאפס את המחיר
       if (name === 'isGift' && checked) {
         newData.price = '';
       }
@@ -265,7 +264,6 @@ function App() {
     const validRatings = drankWines.filter(w => w.rating).map(w => Number(w.rating));
     const avgRating = validRatings.length ? (validRatings.reduce((a,b)=>a+b,0) / validRatings.length).toFixed(1) : '-';
 
-    // חישוב ממוצע מחיר - מתעלם מיינות שסומנו כמתנה
     const validPrices = winesList.filter(w => w.price && !w.isGift).map(w => Number(w.price));
     const avgPrice = validPrices.length ? Math.round(validPrices.reduce((a,b)=>a+b,0) / validPrices.length) : '-';
 
@@ -632,7 +630,7 @@ function App() {
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px', direction: 'rtl' }}>
       <style>{modernStyles}</style>
       
-      <div style={{ textAlign: 'center', marginBottom: '20px', marginTop: '20px' }}>
+      <div style={{ textAlign: 'center', margin: '20px 0' }}>
         <h1 className="serif-title" style={{ color: '#572C3A', fontSize: '2.5rem', margin: '0 0 5px 0' }}>מרתף היין</h1>
         <p className="serif-title" style={{ color: '#B49A65', fontSize: '1.2rem', margin: 0, fontStyle: 'italic' }}>של עילי וגילי</p>
       </div>
@@ -703,6 +701,11 @@ function App() {
                 <div><label style={labelStyle}>זני ענבים</label><input className="soft-input" name="grapes" value={formData.grapes} onChange={handleChange} /></div>
                 <div><label style={labelStyle}>שנת בציר</label><input className="soft-input" type="number" name="vintage" value={formData.vintage} onChange={handleChange} /></div>
               </div>
+              
+              <div>
+                <label style={labelStyle}>חלון שתייה מומלץ (הערכת AI)</label>
+                <input className="soft-input" name="drinkWindow" value={formData.drinkWindow || ''} onChange={handleChange} placeholder="לדוגמה: 2024-2028 או מוכן לשתייה" />
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', backgroundColor: '#F8F7F5', padding: '20px', borderRadius: '24px' }}>
                 <div>
@@ -720,7 +723,6 @@ function App() {
                 </div>
               </div>
 
-              {/* בלוק חדש: מחיר ומתנה - עכשיו מופיע תמיד ומופרד מסטטוס השתייה */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '20px', backgroundColor: '#F8F7F5', borderRadius: '24px', marginTop: '10px' }}>
                 <div>
                   <label style={labelStyle}>מחיר (₪)</label>
@@ -893,6 +895,17 @@ function App() {
                     <p style={{ color: '#9C898E', fontSize: '0.95rem', margin: '0 0 20px 0' }}>
                       זני ענבים: <span style={{fontWeight: '600', color: '#7D736A'}}>{wine.grapes}</span>
                     </p>
+                  )}
+
+                  {/* התצוגה המיוחדת של חלון השתייה ליינות באוסף */}
+                  {wine.bottleStatus === 'stored' && wine.drinkWindow && (
+                    <div style={{ padding: '12px 15px', backgroundColor: '#FDFBF7', borderRadius: '12px', border: '1px solid #EAE6DF', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '1.2rem' }}>⏳</span>
+                      <div>
+                        <span style={{ display: 'block', color: '#9C898E', fontSize: '0.85rem' }}>חלון שתייה</span>
+                        <span style={{ color: '#572C3A', fontWeight: 'bold', fontSize: '1rem' }}>{wine.drinkWindow}</span>
+                      </div>
+                    </div>
                   )}
                   
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '25px', alignItems: 'center' }}>

@@ -57,6 +57,7 @@ const wineSchema = new mongoose.Schema({
   location: String,
   drankWith: String,
   aiInsights: String, 
+  drinkWindow: String, // השדה החדש שהוספנו
   tastingNotes: String,
   memory: String,
   additionalNotes: String,
@@ -84,6 +85,7 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       CRITICAL INSTRUCTIONS FOR HARD-TO-READ OR NATURAL WINE LABELS:
       1. Scan the ENTIRE image, especially the far edges of the label. Look for vertical text, fine print, or small logos.
       2. Natural wines often have hand-drawn, artistic labels without clear text. If you suspect it's a natural wine based on the art style, use your deep internal knowledge base to identify the producer, cuvée, or region based on the visual clues.
+      3. Estimate the optimal drinking window for this wine based on its type, region, and vintage. Keep it concise in Hebrew (e.g., '2024-2028', 'מוכן לשתייה עכשיו', or 'לשמור עוד 3 שנים').
       
       Return ONLY a valid JSON object with EXACTLY these keys. If you cannot find or deduce a value, return an empty string "" for text, or null for numbers. Do not include markdown:
       {
@@ -95,6 +97,7 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         "grapes": "Grape varieties (in Hebrew)",
         "isNatural": true,
         "wineType": "אדום, לבן, רוזה, or כתום",
+        "drinkWindow": "Estimated drinking window in Hebrew",
         "aiInsightsArray": [
           "Fascinating fact 1 about this producer or style (Hebrew)",
           "Fascinating fact 2 (Hebrew)"
@@ -165,7 +168,6 @@ app.delete('/api/wines/:id', async (req, res) => {
   }
 });
 
-// כאן בוצע התיקון שהחליף את הפקודה הישנה בפקודה החדשה
 app.put('/api/wines/:id', async (req, res) => {
   try {
     const updatedWine = await Wine.findByIdAndUpdate(
