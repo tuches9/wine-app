@@ -61,7 +61,13 @@ const wineSchema = new mongoose.Schema({
   tastingNotes: String,
   memory: String,
   additionalNotes: String,
-  bottleStatus: { type: String, default: 'drank' } 
+  bottleStatus: { type: String, default: 'drank' },
+  // השדות החדשים של פרופיל הטעם:
+  acidity: { type: Number, default: 1 },
+  sweetness: { type: Number, default: 1 },
+  body: { type: Number, default: 1 },
+  tannins: { type: Number, default: 1 },
+  alcohol: { type: Number, default: 1 }
 });
 const Wine = mongoose.model('Wine', wineSchema);
 
@@ -85,7 +91,8 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
       CRITICAL INSTRUCTIONS FOR HARD-TO-READ OR NATURAL WINE LABELS:
       1. Scan the ENTIRE image, especially the far edges of the label. Look for vertical text, fine print, or small logos.
       2. Natural wines often have hand-drawn, artistic labels without clear text. If you suspect it's a natural wine based on the art style, use your deep internal knowledge base to identify the producer, cuvée, or region based on the visual clues.
-      3. Estimate the optimal drinking window for this wine based on its type, region, and vintage. Keep it concise in Hebrew (e.g., '2024-2028', 'מוכן לשתייה עכשיו', or 'לשמור עוד 3 שנים').
+      3. Estimate the optimal drinking window concisely in Hebrew (e.g., '2024-2028', 'מוכן לשתייה עכשיו', or 'לשמור עוד 3 שנים').
+      4. Crucial: Rate the wine's profile (Acidity, Sweetness, Body, Tannins, Alcohol) on a scale of 1-5 (1=lowest, 5=highest) based on the classic profile of this type, region, and vintage.
       
       Return ONLY a valid JSON object with EXACTLY these keys. If you cannot find or deduce a value, return an empty string "" for text, or null for numbers. Do not include markdown:
       {
@@ -98,6 +105,11 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         "isNatural": true,
         "wineType": "אדום, לבן, רוזה, or כתום",
         "drinkWindow": "Estimated drinking window in Hebrew",
+        "acidity": 4, // 1-5
+        "sweetness": 1, // 1-5
+        "body": 3, // 1-5
+        "tannins": 1, // 1-5
+        "alcohol": 3, // 1-5
         "aiInsightsArray": [
           "Fascinating fact 1 about this producer or style (Hebrew)",
           "Fascinating fact 2 (Hebrew)"

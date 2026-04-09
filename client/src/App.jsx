@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
 import heic2any from 'heic2any'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+// עדכנו את הייבוא כדי לכלול את רכיבי גרף הרדאר
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 function App() {
   const initialFormState = {
     name: '', producer: '', wineType: 'אדום', country: '', region: '', 
     grapes: '', vintage: 2024, isNatural: false, price: '', isGift: false, rating: 5, 
     location: '', drankWith: '', dateDrank: '', aiInsights: '', drinkWindow: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
-    bottleStatus: 'drank' 
+    bottleStatus: 'drank',
+    // ערכי ברירת המחדל החדשים לפרופיל הטעם
+    acidity: 1, sweetness: 1, body: 1, tannins: 1, alcohol: 1 
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -44,7 +47,9 @@ function App() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => {
-      const newData = { ...prev, [name]: type === 'checkbox' ? checked : value };
+      // עבור סליידרים של פרופיל טעם, נמיר את הערך למספר
+      const isProfileField = ['acidity', 'sweetness', 'body', 'tannins', 'alcohol'].includes(name);
+      const newData = { ...prev, [name]: type === 'checkbox' ? checked : (isProfileField ? Number(value) : value) };
       if (name === 'isGift' && checked) {
         newData.price = '';
       }
@@ -181,7 +186,8 @@ function App() {
 
   const editWine = (wine) => {
     setEditingId(wine._id);
-    setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus });
+    // ודא שכל ערכי פרופיל הטעם מומרים למספרים
+    setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus, acidity: Number(wine.acidity) || 1, sweetness: Number(wine.sweetness) || 1, body: Number(wine.body) || 1, tannins: Number(wine.tannins) || 1, alcohol: Number(wine.alcohol) || 1 });
     setPreviewUrl(wine.imageUrl);
     setCurrentView('scan'); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -224,7 +230,7 @@ function App() {
     if (name.includes('אוסטרליה')) return '🇦🇺';
     if (name.includes('פורטוגל')) return '🇵🇹';
     if (name.includes('יוון')) return '🇬🇷';
-    if (name.includes('אוסטריה')) return '🇦🇹';
+    if (name.includes('אוסטריה')) return '🇦תוו';
     if (name.includes('מרוקו')) return '🇲🇦';
     if (name.includes('לבנון')) return '🇱🇧';
     if (name.includes('קפריסין')) return '🇨🇾';
@@ -624,6 +630,30 @@ function App() {
       text-align: right;
       unicode-bidi: plaintext;
     }
+    
+    /* סגנונות חדשים עבור סליידרים של פרופיל טעם */
+    .profile-slider {
+      width: 100%;
+      height: 10px;
+      border-radius: 5px;
+      background: #EAE6DF;
+      outline: none;
+      opacity: 0.8;
+      transition: opacity .2s;
+      accent-color: #572C3A;
+    }
+    
+    .profile-slider:hover {
+      opacity: 1;
+    }
+    
+    .profile-label-container {
+      display: flex;
+      justify-content: space-between;
+      color: #9C898E;
+      font-size: 0.8rem;
+      margin-top: 4px;
+    }
   `;
 
   return (
@@ -748,6 +778,39 @@ function App() {
                 <textarea className="soft-input rtl-textarea" name="aiInsights" value={formData.aiInsights} onChange={handleChange} style={{ minHeight: '180px', lineHeight: '1.6', backgroundColor: '#FFFFFF', border: '1px solid #EAE6DF' }} />
               </div>
 
+              {/* אזור עריכת פרופיל טעם חדש */}
+              <div style={{ marginTop: '20px', padding: '30px', backgroundColor: '#FDFBF7', borderRadius: '24px', border: '1px solid #EFECE6' }}>
+                <h3 className="serif-title" style={{ color: '#572C3A', margin: '0 0 25px 0', fontSize: '1.5rem', textAlign: 'center' }}>פרופיל טעם (כיול ידני)</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  
+                  {[
+                    { key: 'acidity', label: 'חומציות', low: 'נמוכה', high: 'גבוהה' },
+                    { key: 'sweetness', label: 'מתיקות', low: 'יבש', high: 'מתוק' },
+                    { key: 'body', label: 'גוף', low: 'קל', high: 'מלא' },
+                    { key: 'tannins', label: 'טאנינים', low: 'חלק', high: 'עפיץ' },
+                    { key: 'alcohol', label: 'אלכוהול', low: 'עדין', high: 'חם' },
+                  ].map(item => (
+                    <div key={item.key}>
+                      <label style={{ ...labelStyle, marginBottom: '5px' }}>{item.label}: <span style={{ color: '#572C3A', fontWeight: 'bold', fontSize: '1.1rem' }}>{formData[item.key]}</span></label>
+                      <input 
+                        type="range" 
+                        name={item.key}
+                        min="1" 
+                        max="5" 
+                        step="1" 
+                        value={formData[item.key]} 
+                        onChange={handleChange} 
+                        className="profile-slider" 
+                      />
+                      <div className="profile-label-container">
+                        <span>{item.low}</span>
+                        <span>{item.high}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {formData.bottleStatus === 'drank' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', animation: 'fadeIn 0.4s ease' }}>
                   <div style={{ height: '1px', backgroundColor: '#EFECE6', margin: '10px 0' }}></div>
@@ -867,6 +930,15 @@ function App() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '35px' }}>
             {sortedAndFilteredWines.map((wine) => {
               const typeStyle = getWineTypeStyle(wine.wineType);
+              // הכנת נתונים עבור גרף הרדאר
+              const radarData = [
+                { subject: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
+                { subject: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
+                { subject: 'גוף', A: Number(wine.body) || 1, fullMark: 5 },
+                { subject: 'טאנינים', A: Number(wine.tannins) || 1, fullMark: 5 },
+                { subject: 'אלכוהול', A: Number(wine.alcohol) || 1, fullMark: 5 },
+              ];
+              
               return (
               <div key={wine._id} className="soft-card" style={{ display: 'flex', flexDirection: 'column' }}>
                 
@@ -896,8 +968,7 @@ function App() {
                       זני ענבים: <span style={{fontWeight: '600', color: '#7D736A'}}>{wine.grapes}</span>
                     </p>
                   )}
-
-                  {/* התצוגה המיוחדת של חלון השתייה ליינות באוסף */}
+                  
                   {wine.bottleStatus === 'stored' && wine.drinkWindow && (
                     <div style={{ padding: '12px 15px', backgroundColor: '#FDFBF7', borderRadius: '12px', border: '1px solid #EAE6DF', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontSize: '1.2rem' }}>⏳</span>
@@ -916,6 +987,18 @@ function App() {
                     ) : wine.price ? (
                       <span style={{ color: '#572C3A', backgroundColor: '#EAE6DF', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>₪{wine.price}</span>
                     ) : null}
+                  </div>
+
+                  {/* הצגת גרף הרדאר של פרופיל הטעם */}
+                  <div style={{ marginBottom: '30px', padding: '10px', backgroundColor: '#FFFFFF', borderRadius: '20px', display: 'flex', justifyContent: 'center' }}>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                        <PolarGrid stroke="#EAE6DF" />
+                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} />
+                        <PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false} />
+                        <Radar name="פרופיל טעם" dataKey="A" stroke="#572C3A" fill="#572C3A" fillOpacity={0.2} dot={{ r: 4, fill: '#572C3A', stroke: '#FFFFFF', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#B49A65', stroke: '#FFFFFF' }} />
+                      </RadarChart>
+                    </ResponsiveContainer>
                   </div>
 
                   {wine.bottleStatus === 'drank' && (
