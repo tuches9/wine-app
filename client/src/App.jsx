@@ -226,7 +226,7 @@ function App() {
     if (name.includes('אוסטרליה')) return '🇦🇺';
     if (name.includes('פורטוגל')) return '🇵🇹';
     if (name.includes('יוון')) return '🇬🇷';
-    if (name.includes('אוסטריה')) return '🇦🇹'; // כאן תיקנו את הדגל
+    if (name.includes('אוסטריה')) return '🇦🇹'; 
     if (name.includes('מרוקו')) return '🇲🇦';
     if (name.includes('לבנון')) return '🇱🇧';
     if (name.includes('קפריסין')) return '🇨🇾';
@@ -682,10 +682,21 @@ function App() {
               
               <div style={{ textAlign: 'center', marginBottom: '10px' }}>
                 {previewUrl && <img src={previewUrl} style={{ width: '100%', maxHeight: '350px', objectFit: 'contain', marginBottom: '20px', borderRadius: '20px', backgroundColor: '#F8F7F5', padding: '10px' }} />}
-                <label className="btn-pill-primary" style={{ display: 'inline-block', padding: '15px 35px', boxShadow: '0 8px 20px rgba(87, 44, 58, 0.2)' }}>
-                  {previewUrl ? 'צילום מחדש' : 'סריקת תווית חדשה'}
-                  <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} style={{ display: 'none' }} />
-                </label>
+                
+                {/* כפתורי ההעלאה החדשים */}
+                {!isAnalyzing && (
+                  <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <label className="btn-pill-primary" style={{ display: 'inline-block', padding: '12px 25px', boxShadow: '0 5px 15px rgba(87, 44, 58, 0.2)', cursor: 'pointer', margin: 0 }}>
+                      📸 {previewUrl ? 'צילום מחדש' : 'צילום במצלמה'}
+                      <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} style={{ display: 'none' }} />
+                    </label>
+                    <label className="btn-pill-outline" style={{ display: 'inline-block', padding: '12px 25px', cursor: 'pointer', backgroundColor: '#FFFFFF', margin: 0 }}>
+                      🖼️ {previewUrl ? 'החלפה מגלריה' : 'העלאה מגלריה'}
+                      <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
+                    </label>
+                  </div>
+                )}
+
                 {isAnalyzing && <p style={{ color: '#B49A65', fontSize: '1.1rem', marginTop: '20px', fontWeight: '600', animation: 'pulse 1.5s infinite' }}>מפענח את התווית...</p>}
               </div>
 
@@ -925,7 +936,6 @@ function App() {
             {sortedAndFilteredWines.map((wine) => {
               const typeStyle = getWineTypeStyle(wine.wineType);
               
-              // הפיכת הטקסט עבור ה-SVG כדי שיציג עברית כמו שצריך (תיקון של 'לוהוכלא' וכו')
               const reverseHebrew = (str) => str.split('').reverse().join('');
               const radarData = [
                 { subject: reverseHebrew('חומציות'), originalName: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
@@ -985,7 +995,6 @@ function App() {
                     ) : null}
                   </div>
 
-                  {/* הגרף המעודכן עם תמיכה ב-Tooltip וטקסט מתוקן */}
                   <div style={{ marginBottom: '30px', padding: '10px', backgroundColor: '#FFFFFF', borderRadius: '20px', display: 'flex', justifyContent: 'center' }}>
                     <ResponsiveContainer width="100%" height={220}>
                       <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
