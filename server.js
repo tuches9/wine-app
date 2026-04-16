@@ -4,7 +4,8 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+// שים לב שהוספנו כאן את הגדרות הבטיחות של ג'מיני
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const cloudinary = require('cloudinary').v2;
 
 const app = express();
@@ -62,7 +63,6 @@ const wineSchema = new mongoose.Schema({
   memory: String,
   additionalNotes: String,
   bottleStatus: { type: String, default: 'drank' },
-  // השדות החדשים של פרופיל הטעם:
   acidity: { type: Number, default: 1 },
   sweetness: { type: Number, default: 1 },
   body: { type: Number, default: 1 },
@@ -75,15 +75,23 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
   console.log("--- מתחיל פענוח תווית יין ---");
   try {
     if (!req.file) {
+      console.log("❌ לא התקבלה תמונה בשרת.");
       return res.status(400).json({ error: 'No image uploaded' });
     }
 
     const fileData = fs.readFileSync(req.file.path);
     const imageBase64 = { inlineData: { data: fileData.toString("base64"), mimeType: req.file.mimetype } };
 
+    // הגדרנו את ג'מיני להיות סבלני ולא לחסום לנו תמונות בגלל שזה אלכוהול
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json" }
+      generationConfig: { responseMimeType: "application/json" },
+      safetySettings: [
+        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE }
+      ]
     });
     
     const prompt = `
@@ -125,6 +133,7 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         const cleanJsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
         wineData = JSON.parse(cleanJsonString);
     } catch (parseError) {
+        console.error("❌ ה-AI לא החזיר JSON תקין:", responseText);
         throw new Error("Invalid JSON format from Gemini");
     }
     
@@ -139,12 +148,16 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     });
     fs.unlinkSync(req.file.path); 
 
+    console.log("✅ פענוח תווית הסתיים בהצלחה!");
     res.json({ 
       imageUrl: cloudinaryResponse.secure_url, 
       analyzedData: wineData
     });
 
   } catch (error) {
+    // עכשיו נראה את השגיאה בבירור ב-Render Logs
+    console.error("❌ שגיאה כללית בפענוח היין:", error.message || error);
+    
     if (req.file && fs.existsSync(req.file.path)) {
        fs.unlinkSync(req.file.path);
     }

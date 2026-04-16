@@ -119,21 +119,29 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/api/analyze`, { method: 'POST', body: imageFormData });
       const data = await response.json();
       
-      if (response.ok) {
-        let insightsText = '';
-        if (data.analyzedData.aiInsightsArray && Array.isArray(data.analyzedData.aiInsightsArray)) {
-            insightsText = '• ' + data.analyzedData.aiInsightsArray.join('\n\n• ');
-        }
-        
-        setFormData(prev => ({ 
-            ...prev, 
-            ...data.analyzedData, 
-            imageUrl: data.imageUrl,
-            aiInsights: insightsText
-        }));
+      // תוספת קריטית - טיפול בשגיאות מהשרת כדי שלא נשתוק
+      if (!response.ok) {
+        console.error("Server returned an error:", data.details);
+        alert(`הייתה בעיה בסריקת התווית: \n${data.details || 'ה-AI לא הצליח לקרוא את התמונה.'}\n\nנסה לצלם שוב בזווית ישרה ותאורה טובה יותר.`);
+        return; // עוצרים כאן ולא מעדכנים את הטופס הריק
       }
+      
+      // אם הגענו לכאן - הכל עבר בשלום
+      let insightsText = '';
+      if (data.analyzedData.aiInsightsArray && Array.isArray(data.analyzedData.aiInsightsArray)) {
+          insightsText = '• ' + data.analyzedData.aiInsightsArray.join('\n\n• ');
+      }
+      
+      setFormData(prev => ({ 
+          ...prev, 
+          ...data.analyzedData, 
+          imageUrl: data.imageUrl,
+          aiInsights: insightsText
+      }));
+      
     } catch (error) { 
-        alert('השרת מתעורר או שיש שגיאת תקשורת. נסה שוב בעוד כמה שניות.'); 
+        console.error("Communication error:", error);
+        alert('בעיית תקשורת מול השרת. ודא שהאינטרנט תקין ונסה שוב בעוד רגע.'); 
     } finally { 
         setIsAnalyzing(false); 
     }
@@ -683,7 +691,6 @@ function App() {
               <div style={{ textAlign: 'center', marginBottom: '10px' }}>
                 {previewUrl && <img src={previewUrl} style={{ width: '100%', maxHeight: '350px', objectFit: 'contain', marginBottom: '20px', borderRadius: '20px', backgroundColor: '#F8F7F5', padding: '10px' }} />}
                 
-                {/* כפתורי ההעלאה החדשים */}
                 {!isAnalyzing && (
                   <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
                     <label className="btn-pill-primary" style={{ display: 'inline-block', padding: '12px 25px', boxShadow: '0 5px 15px rgba(87, 44, 58, 0.2)', cursor: 'pointer', margin: 0 }}>
