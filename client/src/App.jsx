@@ -3,10 +3,13 @@ import heic2any from 'heic2any'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 function App() {
+  const currentYear = new Date().getFullYear();
+  const today = new Date().toISOString().split('T')[0];
+
   const initialFormState = {
     name: '', producer: '', wineType: 'אדום', country: '', region: '', 
-    grapes: '', vintage: 2024, isNatural: false, price: '', isGift: false, rating: 5, 
-    location: '', drankWith: '', dateDrank: '', aiInsights: '', drinkWindow: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
+    grapes: '', vintage: currentYear, isNatural: false, price: '', isGift: false, rating: 5.0, 
+    location: '', drankWith: '', dateDrank: today, aiInsights: '', drinkWindow: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
     bottleStatus: 'drank',
     acidity: 1, sweetness: 1, body: 1, tannins: 1, alcohol: 1 
   };
@@ -27,7 +30,6 @@ function App() {
   
   const [selectedGraphYear, setSelectedGraphYear] = useState(new Date().getFullYear());
 
-  // הניתוב החכם! אם אנחנו בטסט במחשב הוא ישתמש ב-localhost, אם זה באינטרנט הוא ישתמש ב-Render.
   const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000' 
     : 'https://wine-app-server.onrender.com';
@@ -48,8 +50,8 @@ function App() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => {
-      const isProfileField = ['acidity', 'sweetness', 'body', 'tannins', 'alcohol'].includes(name);
-      const newData = { ...prev, [name]: type === 'checkbox' ? checked : (isProfileField ? Number(value) : value) };
+      const isNumericField = ['acidity', 'sweetness', 'body', 'tannins', 'alcohol', 'rating', 'vintage', 'price'].includes(name);
+      const newData = { ...prev, [name]: type === 'checkbox' ? checked : (isNumericField && value !== '' ? Number(value) : value) };
       if (name === 'isGift' && checked) {
         newData.price = '';
       }
@@ -184,7 +186,7 @@ function App() {
 
   const openBottle = (wine) => {
     setEditingId(wine._id);
-    setFormData({ ...initialFormState, ...wine, bottleStatus: 'drank' });
+    setFormData({ ...initialFormState, ...wine, bottleStatus: 'drank', dateDrank: today });
     setPreviewUrl(wine.imageUrl);
     setCurrentView('scan'); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -828,21 +830,34 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', animation: 'fadeIn 0.4s ease' }}>
                   <div style={{ height: '1px', backgroundColor: '#EFECE6', margin: '10px 0' }}></div>
                   
+                  {/* סליידר ציון אישי במקום תיבת טקסט רגילה! */}
+                  <div style={{ padding: '15px', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #EAE6DF' }}>
+                    <label style={{ ...labelStyle, marginBottom: '5px' }}>ציון אישי: <span style={{ color: '#572C3A', fontWeight: 'bold', fontSize: '1.2rem' }}>{formData.rating} ★</span></label>
+                    <input 
+                        type="range" 
+                        name="rating" 
+                        min="0" 
+                        max="5" 
+                        step="0.1" 
+                        value={formData.rating} 
+                        onChange={handleChange} 
+                        className="profile-slider" 
+                    />
+                    <div className="profile-label-container">
+                        <span>0</span>
+                        <span>5</span>
+                    </div>
+                  </div>
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                     <div>
                       <label style={labelStyle}>תאריך טעימה</label>
                       <input className="soft-input" type="date" name="dateDrank" value={formData.dateDrank || ''} onChange={handleChange} />
                     </div>
-                    <div>
-                      <label style={labelStyle}>ציון אישי (1-5)</label>
-                      <input className="soft-input" type="number" step="0.1" name="rating" value={formData.rating} onChange={handleChange} />
-                    </div>
+                    <div><label style={labelStyle}>מיקום הטעימה</label><input className="soft-input" name="location" value={formData.location} onChange={handleChange} /></div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div><label style={labelStyle}>מיקום הטעימה</label><input className="soft-input" name="location" value={formData.location} onChange={handleChange} /></div>
-                    <div><label style={labelStyle}>שותפים לטעימה</label><input className="soft-input" name="drankWith" value={formData.drankWith} onChange={handleChange} /></div>
-                  </div>
+                  <div><label style={labelStyle}>שותפים לטעימה</label><input className="soft-input" name="drankWith" value={formData.drankWith} onChange={handleChange} /></div>
 
                   <div>
                     <label style={labelStyle}>רשמי טעימה</label>
