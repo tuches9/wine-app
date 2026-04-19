@@ -27,7 +27,10 @@ function App() {
   
   const [selectedGraphYear, setSelectedGraphYear] = useState(new Date().getFullYear());
 
-  const API_BASE_URL = 'https://wine-app-server.onrender.com';
+  // הניתוב החכם! אם אנחנו בטסט במחשב הוא ישתמש ב-localhost, אם זה באינטרנט הוא ישתמש ב-Render.
+  const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3000' 
+    : 'https://wine-app-server.onrender.com';
 
   const fetchWines = async () => {
     try {
@@ -119,14 +122,12 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/api/analyze`, { method: 'POST', body: imageFormData });
       const data = await response.json();
       
-      // תוספת קריטית - טיפול בשגיאות מהשרת כדי שלא נשתוק
       if (!response.ok) {
         console.error("Server returned an error:", data.details);
         alert(`הייתה בעיה בסריקת התווית: \n${data.details || 'ה-AI לא הצליח לקרוא את התמונה.'}\n\nנסה לצלם שוב בזווית ישרה ותאורה טובה יותר.`);
-        return; // עוצרים כאן ולא מעדכנים את הטופס הריק
+        return; 
       }
       
-      // אם הגענו לכאן - הכל עבר בשלום
       let insightsText = '';
       if (data.analyzedData.aiInsightsArray && Array.isArray(data.analyzedData.aiInsightsArray)) {
           insightsText = '• ' + data.analyzedData.aiInsightsArray.join('\n\n• ');
