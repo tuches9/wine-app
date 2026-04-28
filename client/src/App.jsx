@@ -29,6 +29,7 @@ function App() {
   const [sortOption, setSortOption] = useState('dateDrank_desc');
   
   const [selectedGraphYear, setSelectedGraphYear] = useState(new Date().getFullYear());
+  const [zoomedImage, setZoomedImage] = useState(null); // מצב חדש להגדלת תמונה
 
   const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000' 
@@ -327,11 +328,12 @@ function App() {
         countryRatings[w.country].count += 1;
       }
     });
+    // שיניתי כאן ל-10 מדינות במקום 5
     const countryAverages = Object.keys(countryRatings).map(c => ({
       name: c,
       avg: (countryRatings[c].sum / countryRatings[c].count).toFixed(1),
       count: countryRatings[c].count
-    })).sort((a,b) => b.avg - a.avg).slice(0, 5); 
+    })).sort((a,b) => b.avg - a.avg).slice(0, 10); 
 
     const yearsSet = new Set(drankWines.map(w => {
       const dStr = w.dateDrank || w.dateOpened;
@@ -369,6 +371,19 @@ function App() {
   };
 
   const stats = calculateStats();
+
+  // חישוב כמות היינות הפעילים בלשונית הנוכחית כדי להציג בתוך הסוגריים שבסינון
+  const winesInCurrentTab = winesList.filter(w => (cellarTab === 'stored' ? w.bottleStatus === 'stored' : w.bottleStatus !== 'stored'));
+  
+  const getTypeCount = (type) => {
+    if (type === 'הכל') return winesInCurrentTab.length;
+    return winesInCurrentTab.filter(w => w.wineType === type).length;
+  };
+
+  const getCountryCount = (country) => {
+    if (country === 'הכל') return winesInCurrentTab.length;
+    return winesInCurrentTab.filter(w => w.country === country).length;
+  };
 
   const getSortedAndFilteredWines = () => {
     let result = winesList.filter(wine => {
@@ -830,7 +845,6 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', animation: 'fadeIn 0.4s ease' }}>
                   <div style={{ height: '1px', backgroundColor: '#EFECE6', margin: '10px 0' }}></div>
                   
-                  {/* סליידר ציון אישי במקום תיבת טקסט רגילה! */}
                   <div style={{ padding: '15px', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #EAE6DF' }}>
                     <label style={{ ...labelStyle, marginBottom: '5px' }}>ציון אישי: <span style={{ color: '#572C3A', fontWeight: 'bold', fontSize: '1.2rem' }}>{formData.rating} ★</span></label>
                     <input 
@@ -924,11 +938,11 @@ function App() {
               onChange={(e) => setFilterType(e.target.value)}
               className="filter-select"
             >
-              <option value="הכל">כל הסוגים</option>
-              <option value="אדום">אדום</option>
-              <option value="לבן">לבן</option>
-              <option value="כתום">כתום</option>
-              <option value="רוזה">רוזה</option>
+              <option value="הכל">כל הסוגים ({getTypeCount('הכל')})</option>
+              <option value="אדום">אדום ({getTypeCount('אדום')})</option>
+              <option value="לבן">לבן ({getTypeCount('לבן')})</option>
+              <option value="כתום">כתום ({getTypeCount('כתום')})</option>
+              <option value="רוזה">רוזה ({getTypeCount('רוזה')})</option>
             </select>
 
             <select 
@@ -937,7 +951,9 @@ function App() {
               className="filter-select"
             >
               {uniqueCountries.map(country => (
-                <option key={country} value={country}>{country === 'הכל' ? 'כל המדינות' : country}</option>
+                <option key={country} value={country}>
+                  {country === 'הכל' ? 'כל המדינות' : country} ({getCountryCount(country)})
+                </option>
               ))}
             </select>
 
@@ -973,7 +989,11 @@ function App() {
                 
                 <div style={{ padding: '20px', backgroundColor: '#F8F7F5', display: 'flex', justifyContent: 'center', position: 'relative' }}>
                   {wine.imageUrl ? (
-                     <img src={wine.imageUrl} style={{ width: '100%', height: '280px', objectFit: 'contain', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.1))' }} />
+                     <img 
+                      src={wine.imageUrl} 
+                      onClick={() => setZoomedImage(wine.imageUrl)}
+                      style={{ width: '100%', height: '280px', objectFit: 'contain', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.1))', cursor: 'zoom-in' }} 
+                     />
                   ) : (
                      <div style={{ width: '100%', height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#BCAFA4' }}>ללא תמונה</div>
                   )}
@@ -1271,6 +1291,30 @@ function App() {
               <p className="serif-title" style={{ color: '#BCAFA4', fontSize: '1.5rem', margin: 0 }}>המרתף עדיין ריק.</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* אזור להצגת התמונה בהגדלה */}
+      {zoomedImage && (
+        <div 
+          style={{
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
+            backgroundColor: 'rgba(0, 0, 0, 0.85)', zIndex: 1000, 
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            cursor: 'zoom-out', padding: '20px', boxSizing: 'border-box'
+          }}
+          onClick={() => setZoomedImage(null)}
+        >
+          <img 
+            src={zoomedImage} 
+            style={{
+              maxHeight: '90vh', maxWidth: '100%', objectFit: 'contain', 
+              borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+            }} 
+          />
+          <div style={{ position: 'absolute', top: '20px', right: '30px', color: 'white', fontSize: '2.5rem', fontWeight: 'bold', cursor: 'pointer' }}>
+            &times;
+          </div>
         </div>
       )}
 
