@@ -7,22 +7,21 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const cloudinary = require('cloudinary').v2;
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
 console.log("--- שרת מרתף היין עולה לאוויר ---");
-console.log("בדיקת משתני סביבה:");
-console.log("EMAIL_USER הוגדר?", process.env.EMAIL_USER ? "✅ כן" : "❌ לא");
-console.log("EMAIL_PASS הוגדר?", process.env.EMAIL_PASS ? "✅ כן" : "❌ לא");
+console.log("בדיקת מפתח Resend:", process.env.RESEND_API_KEY ? "✅ מוגדר" : "❌ חסר");
 
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key');
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME || 'dummy',
@@ -76,18 +75,6 @@ const wineSchema = new mongoose.Schema({
 });
 
 const Wine = mongoose.model('Wine', wineSchema);
-
-// הגדרות למייל עם תיקון ה-IPv6 והגדרות אבטחה של ג'ימייל
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  family: 4, // הכרחת שימוש ב-IPv4 כדי למנוע את שגיאת ENETUNREACH ברנדר
-  auth: {
-    user: process.env.EMAIL_USER, 
-    pass: process.env.EMAIL_PASS  
-  }
-});
 
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   console.log("--- מתחיל פענוח תווית יין ---");
@@ -147,7 +134,6 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     
     let wineData;
     try {
-        // התיקון שמונע שבירת שורות בהעתקה-הדבקה: יצירת התו בעזרת קוד ASCII במקום להקליד אותו
         const backticks = String.fromCharCode(96, 96, 96);
         let cleanJsonString = responseText.replace(new RegExp(backticks + 'json', 'g'), '');
         cleanJsonString = cleanJsonString.replace(new RegExp(backticks, 'g'), '');
@@ -261,10 +247,11 @@ app.put('/api/wines/:id', async (req, res) => {
 
     res.json(updatedWine);
 
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-      const mailOptions = {
-        from: process.env.EMAIL_USER, 
-        to: 'ilaybittan@outlook.com', 
+    // שליחת המייל ברקע בעזרת Resend
+    if (process.env.RESEND_API_KEY) {
+      resend.emails.send({
+        from: 'onboarding@resend.dev',
+        to: 'ilaybittan@outlook.com',
         subject: `🍷 מרתף היין: עודכנו פרטים ל-${updatedWine.name}`,
         html: `
           <div dir="rtl" style="font-family: Arial, sans-serif; color: #332F2C; background-color: #F4F2EE; padding: 25px; border-radius: 12px; max-width: 600px; margin: 0 auto;">
@@ -283,11 +270,9 @@ app.put('/api/wines/:id', async (req, res) => {
             <p style="font-weight: bold; color: #572C3A;">לחיים! 🥂</p>
           </div>
         `
-      };
-
-      transporter.sendMail(mailOptions)
-        .then(() => console.log("✉️ התראת מייל נשלחה בהצלחה ברקע"))
-        .catch(emailError => console.error('❌ שגיאה בשליחת המייל ברקע:', emailError.message));
+      })
+      .then(data => console.log("✉️ התראת מייל נשלחה בהצלחה ברקע דרך Resend"))
+      .catch(emailError => console.error('❌ שגיאה בשליחת המייל דרך Resend:', emailError));
     }
 
   } catch (err) {
