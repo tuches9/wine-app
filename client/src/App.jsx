@@ -702,6 +702,26 @@ function App() {
       cursor: not-allowed;
     }
 
+    /* מחלקת עיצוב חדשה לתיבת החיפוש החופשי שמונעת ממנה להימתח */
+    .search-input {
+      flex: 1;
+      min-width: 200px;
+      border: 1px solid #EAE6DF;
+      background-color: #F8F7F5;
+      color: #332F2C;
+      outline: none;
+      font-size: 1rem;
+      font-family: 'Assistant', sans-serif;
+      padding: 12px;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .search-input:focus {
+      background-color: #FFFFFF;
+      border-color: #D3C3B0;
+    }
+
     .filter-panel {
       display: flex;
       flex-wrap: wrap;
@@ -790,7 +810,12 @@ function App() {
       border-color: #D3C3B0;
     }
 
+    /* תיקון באג העברית של אפל/ספארי בגרפים */
     .recharts-tooltip-wrapper { direction: rtl; }
+    .recharts-text {
+      direction: rtl;
+      font-family: 'Assistant', sans-serif;
+    }
     
     .cellar-tabs {
       display: flex;
@@ -889,6 +914,14 @@ function App() {
       }
       .filter-panel {
         flex-direction: column;
+      }
+      .search-input {
+        flex: none; /* ביטול המתיחה של תיבת החיפוש לגובה */
+        width: 100%;
+      }
+      .filter-select {
+        flex: none;
+        width: 100%;
       }
     }
   `;
@@ -1148,7 +1181,7 @@ function App() {
               placeholder="חיפוש חופשי..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ flex: '1 1 200px', border: '1px solid #EAE6DF', backgroundColor: '#F8F7F5', color: '#332F2C', outline: 'none', fontSize: '1rem', fontFamily: 'Assistant', padding: '12px', borderRadius: '12px' }}
+              className="search-input"
             />
             
             <select 
@@ -1294,7 +1327,7 @@ function App() {
                           <ResponsiveContainer width="100%" height={220}>
                             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                               <PolarGrid stroke="#EAE6DF" />
-                              <PolarAngleAxis dataKey="subject" tick={{ fill: '#7D736A', fontSize: 13, fontFamily: 'Assistant', fontWeight: 'bold' }} />
+                              <PolarAngleAxis dataKey="subject" tick={{ fill: '#7D736A', fontSize: 13, fontFamily: 'Assistant', fontWeight: 'bold', style: { direction: 'rtl' } }} />
                               <PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false} />
                               <Tooltip 
                                 formatter={(value) => [value, 'דירוג']}
@@ -1499,7 +1532,7 @@ function App() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={stats.graphData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#EAE6DF" vertical={false} />
-                        <XAxis dataKey="name" stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} axisLine={false} tickLine={false} />
+                        <XAxis dataKey="name" stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant', style: { direction: 'rtl' } }} axisLine={false} tickLine={false} />
                         <YAxis stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} axisLine={false} tickLine={false} allowDecimals={false} />
                         <Tooltip 
                           contentStyle={{ backgroundColor: '#FDFBF7', border: '1px solid #EAE6DF', borderRadius: '8px', color: '#332F2C', direction: 'rtl', fontFamily: 'Assistant' }}
