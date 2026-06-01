@@ -1,6 +1,3 @@
-// השורה הזו היא זו שפותרת את בעיית ה-IPv6 וה-Timeout ב-Render
-require('dns').setDefaultResultOrder('ipv4first');
-
 require('dotenv').config(); 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -80,11 +77,12 @@ const wineSchema = new mongoose.Schema({
 
 const Wine = mongoose.model('Wine', wineSchema);
 
-// הגדרות מתוקנות לחיבור יציב מ-Render
+// הגדרות מתוקנות לחיבור יציב מ-Render שפותרות את בעיית ה-IPv6 נקודתית
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
-  secure: true, 
+  secure: true,
+  family: 4, // <-- השורה הזו פותרת את בעיית ה-IPv6 ספציפית למייל בלי לפגוע במסד הנתונים!
   auth: {
     user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASS  
@@ -188,6 +186,7 @@ app.post('/api/wines', async (req, res) => {
     await newWine.save();
     res.status(201).json({ message: 'Wine saved successfully!' });
   } catch (err) {
+    console.error("❌ Error saving wine:", err);
     res.status(500).json({ error: 'Error saving wine' });
   }
 });
@@ -291,6 +290,7 @@ app.put('/api/wines/:id', async (req, res) => {
 
     res.json(updatedWine);
   } catch (err) {
+    console.error("❌ Error updating wine:", err);
     res.status(500).json({ error: 'Error updating wine' });
   }
 });

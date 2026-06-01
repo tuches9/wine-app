@@ -164,6 +164,8 @@ function App() {
       const response = await fetch(url, {
         method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData)
       });
+      
+      // טיפול תקין בשגיאות כדי שהמערכת לעולם לא "תיתקע"
       if (response.ok) {
         setEditingId(null);
         
@@ -176,8 +178,19 @@ function App() {
         fetchWines(); 
         setCurrentView('cellar'); 
         window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        try {
+          const errData = await response.json();
+          alert(`שגיאה מהשרת: ${errData.error || 'לא ניתן היה לשמור את היין. נסה שוב.'}`);
+        } catch(e) {
+          alert(`תקלת שרת כללית (שגיאה ${response.status}). היין לא נשמר.`);
+        }
       }
-    } catch (error) { alert('שגיאה בשמירה.'); } finally { setIsSaving(false); }
+    } catch (error) { 
+      alert('בעיית רשת: אין תקשורת מול השרת.'); 
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
   const handleDelete = async (id) => {
@@ -445,7 +458,7 @@ function App() {
         stored: countryStats[c].stored 
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // הוגדל ל-10 במקום 5
+      .slice(0, 10); 
 
     const topCountry = topCountriesVolume.length > 0 ? topCountriesVolume[0].name : '-';
 
@@ -463,7 +476,7 @@ function App() {
       name: c,
       avg: (countryRatings[c].sum / countryRatings[c].count).toFixed(1),
       count: countryRatings[c].count
-    })).sort((a,b) => b.avg - a.avg).slice(0, 10); // הוגדל ל-10 במקום 5
+    })).sort((a,b) => b.avg - a.avg).slice(0, 10); 
 
     const yearsSet = new Set(drankWines.map(w => {
       const dStr = w.dateDrank || w.dateOpened;
@@ -1119,12 +1132,10 @@ function App() {
             </select>
           </div>
           
-          {/* הוספנו כאן את ה- alignItems: 'start' כדי לפתור את בעיית המתיחה של הכרטיסיות הסמוכות */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '35px', alignItems: 'start' }}>
             {sortedAndFilteredWines.map((wine) => {
               const typeStyle = getWineTypeStyle(wine.wineType);
               
-              // הורדנו את ה- reverseHebrew, עכשיו דפדפנים מודרניים יודעים להציג עברית בגרפים כראוי
               const radarData = [
                 { subject: 'חומציות', originalName: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
                 { subject: 'מתיקות', originalName: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
@@ -1210,7 +1221,7 @@ function App() {
                       onClick={() => toggleCard(wine._id)} 
                       className="toggle-btn"
                     >
-                      {expandedCards[wine._id] ? 'הסתר סומלייה ופרופיל טעמים' : 'הצג סומלייה ופרופיל טעמים'}
+                      {expandedCards[wine._id] ? 'הסתר מידע נוסף' : 'הצג סומלייה ופרופיל טעמים'}
                     </button>
 
                     {expandedCards[wine._id] && (
@@ -1257,7 +1268,7 @@ function App() {
                         disabled={sharingId === wine._id}
                         style={{ flex: 1, padding: '8px 5px', fontSize: '0.95rem', color: '#B49A65', borderColor: '#EAE6DF' }}
                       >
-                        {sharingId === wine._id ? '⏳' : 'שתף'}
+                        {sharingId === wine._id ? 'מייצר...' : 'שתף'}
                       </button>
                       <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9', padding: '8px 5px', fontSize: '0.95rem' }}>מחיקה</button>
                     </div>
