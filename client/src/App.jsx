@@ -31,7 +31,6 @@ function App() {
   
   const [selectedGraphYear, setSelectedGraphYear] = useState(new Date().getFullYear());
 
-  // מצבים חדשים עבור הפיצ'רים שהוספנו
   const [expandedCards, setExpandedCards] = useState({});
   const [sharingId, setSharingId] = useState(null);
 
@@ -205,7 +204,6 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // פונקציה לפתיחה וסגירה של כרטיסייה (הצגת הסומלייה והרדאר)
   const toggleCard = (id) => {
     setExpandedCards(prev => ({
       ...prev,
@@ -213,17 +211,15 @@ function App() {
     }));
   };
 
-  // פונקציה ליצירת תמונה לשיתוף (9:16)
   const generateShareImage = async (wine) => {
     setSharingId(wine._id);
     try {
-      // יצירת קונטיינר מוסתר עם עיצוב מדויק
       const container = document.createElement('div');
       container.style.position = 'fixed';
       container.style.top = '-10000px';
       container.style.right = '-10000px';
-      container.style.width = '540px'; // פרופורציה של 9
-      container.style.height = '960px'; // פרופורציה של 16
+      container.style.width = '540px'; 
+      container.style.height = '960px'; 
       container.style.backgroundColor = '#F4F2EE';
       container.style.direction = 'rtl';
       container.style.fontFamily = "'Assistant', sans-serif";
@@ -231,7 +227,6 @@ function App() {
       container.style.flexDirection = 'column';
       container.style.boxSizing = 'border-box';
 
-      // חלק עליון: תמונה
       let imgHtml = '<div style="height: 40%; background-color: #F8F7F5; display: flex; align-items: center; justify-content: center;"><span style="color: #BCAFA4; font-size: 1.5rem;">ללא תמונה</span></div>';
       if (wine.imageUrl) {
         imgHtml = `
@@ -241,16 +236,13 @@ function App() {
         `;
       }
 
-      // ציון אם קיים
       const ratingHtml = wine.rating && wine.bottleStatus === 'drank'
         ? `<div style="color: #B49A65; font-size: 2rem; font-weight: bold; margin-bottom: 5px;">${wine.rating} ★</div>`
         : '';
 
-      // תגית סוג היין (עם צבע מתאים)
       const typeStyleObj = getWineTypeStyle(wine.wineType);
       const typeLabel = `<span style="display: inline-block; background-color: ${typeStyleObj.color}; color: white; padding: 6px 16px; border-radius: 50px; font-size: 1.1rem; font-weight: bold; margin-bottom: 20px;">${wine.wineType}</span>`;
 
-      // רשמים וזיכרון אם קיימים
       let notesHtml = '';
       if (wine.tastingNotes && wine.bottleStatus === 'drank') {
         notesHtml = `
@@ -293,12 +285,11 @@ function App() {
 
       document.body.appendChild(container);
 
-      // מחכים חצי שנייה כדי לוודא שהתמונה מ-Cloudinary נטענה ב-DOM המוסתר
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const canvas = await html2canvas(container, {
         useCORS: true,
-        scale: 2, // איכות גבוהה יותר לשיתוף
+        scale: 2, 
         backgroundColor: '#F4F2EE',
         logging: false
       });
@@ -333,8 +324,8 @@ function App() {
       case 'לבן': return { color: '#8A7A40', backgroundColor: '#FDFDF2' }; 
       case 'כתום': return { color: '#B35A22', backgroundColor: '#FEF8F3' }; 
       case 'רוזה': return { color: '#B06D7B', backgroundColor: '#FDF6F8' }; 
-      case 'מבעבע': return { color: '#B89B48', backgroundColor: '#FEFCF4' }; // זהב בהיר למבעבע
-      case 'סאקה': return { color: '#5A7D8F', backgroundColor: '#F2F6F9' }; // תכלת-אפרפר לסאקה
+      case 'מבעבע': return { color: '#B89B48', backgroundColor: '#FEFCF4' }; 
+      case 'סאקה': return { color: '#5A7D8F', backgroundColor: '#F2F6F9' }; 
       default: return { color: '#5A5A5A', backgroundColor: '#F9F9F9' };
     }
   };
@@ -342,7 +333,6 @@ function App() {
   const getCountryFlag = (country) => {
     if (!country) return '';
     const name = country.toLowerCase().trim();
-    // הרשימה המקורית
     if (name.includes('ישראל')) return '🇮🇱';
     if (name.includes('צרפת')) return '🇫🇷';
     if (name.includes('איטליה')) return '🇮🇹';
@@ -372,7 +362,6 @@ function App() {
     if (name.includes('אנגליה') || name.includes('בריטניה')) return '🇬🇧';
     if (name.includes('קנדה')) return '🇨🇦';
     
-    // הרשימה החדשה - 20 מדינות גדולות וחשובות
     if (name.includes('יפן')) return '🇯🇵';
     if (name.includes('סין')) return '🇨🇳';
     if (name.includes('הודו')) return '🇮🇳';
@@ -456,7 +445,7 @@ function App() {
         stored: countryStats[c].stored 
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .slice(0, 10); // הוגדל ל-10 במקום 5
 
     const topCountry = topCountriesVolume.length > 0 ? topCountriesVolume[0].name : '-';
 
@@ -474,7 +463,7 @@ function App() {
       name: c,
       avg: (countryRatings[c].sum / countryRatings[c].count).toFixed(1),
       count: countryRatings[c].count
-    })).sort((a,b) => b.avg - a.avg).slice(0, 5); 
+    })).sort((a,b) => b.avg - a.avg).slice(0, 10); // הוגדל ל-10 במקום 5
 
     const yearsSet = new Set(drankWines.map(w => {
       const dStr = w.dateDrank || w.dateOpened;
@@ -639,6 +628,7 @@ function App() {
       border: none;
       transition: all 0.4s ease;
       overflow: hidden;
+      width: 100%;
     }
 
     .stat-card {
@@ -746,23 +736,26 @@ function App() {
     
     .toggle-btn {
       width: 100%;
-      padding: 12px;
-      border-radius: 15px;
-      background-color: #F8F7F5;
+      padding: 10px;
+      background-color: transparent;
       border: 1px solid #EAE6DF;
-      color: #572C3A;
-      font-weight: bold;
+      border-radius: 12px;
+      color: #7D736A;
+      font-weight: 600;
       cursor: pointer;
       font-family: 'Assistant', sans-serif;
-      font-size: 1rem;
+      font-size: 0.95rem;
       transition: all 0.3s ease;
+      text-align: center;
       display: flex;
       justify-content: center;
       align-items: center;
       gap: 8px;
     }
     .toggle-btn:hover {
-      background-color: #EAE6DF;
+      background-color: #F8F7F5;
+      color: #572C3A;
+      border-color: #D3C3B0;
     }
 
     .recharts-tooltip-wrapper { direction: rtl; }
@@ -1126,17 +1119,18 @@ function App() {
             </select>
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '35px' }}>
+          {/* הוספנו כאן את ה- alignItems: 'start' כדי לפתור את בעיית המתיחה של הכרטיסיות הסמוכות */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '35px', alignItems: 'start' }}>
             {sortedAndFilteredWines.map((wine) => {
               const typeStyle = getWineTypeStyle(wine.wineType);
               
-              const reverseHebrew = (str) => str.split('').reverse().join('');
+              // הורדנו את ה- reverseHebrew, עכשיו דפדפנים מודרניים יודעים להציג עברית בגרפים כראוי
               const radarData = [
-                { subject: reverseHebrew('חומציות'), originalName: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
-                { subject: reverseHebrew('מתיקות'), originalName: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
-                { subject: reverseHebrew('גוף'), originalName: 'גוף', A: Number(wine.body) || 1, fullMark: 5 },
-                { subject: reverseHebrew('טאנינים'), originalName: 'טאנינים', A: Number(wine.tannins) || 1, fullMark: 5 },
-                { subject: reverseHebrew('אלכוהול'), originalName: 'אלכוהול', A: Number(wine.alcohol) || 1, fullMark: 5 },
+                { subject: 'חומציות', originalName: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
+                { subject: 'מתיקות', originalName: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
+                { subject: 'גוף', originalName: 'גוף', A: Number(wine.body) || 1, fullMark: 5 },
+                { subject: 'טאנינים', originalName: 'טאנינים', A: Number(wine.tannins) || 1, fullMark: 5 },
+                { subject: 'אלכוהול', originalName: 'אלכוהול', A: Number(wine.alcohol) || 1, fullMark: 5 },
               ];
               
               return (
@@ -1211,13 +1205,12 @@ function App() {
                     </div>
                   )}
 
-                  {/* אזור נפתח / נסגר (Drop-down) לסומלייה ולרדאר */}
                   <div style={{ marginTop: '5px', marginBottom: '25px' }}>
                     <button 
                       onClick={() => toggleCard(wine._id)} 
                       className="toggle-btn"
                     >
-                      {expandedCards[wine._id] ? '🔼 הסתר סומלייה ופרופיל טעמים' : '🔽 הצג סומלייה ופרופיל טעמים'}
+                      {expandedCards[wine._id] ? 'הסתר סומלייה ופרופיל טעמים' : 'הצג סומלייה ופרופיל טעמים'}
                     </button>
 
                     {expandedCards[wine._id] && (
@@ -1264,7 +1257,7 @@ function App() {
                         disabled={sharingId === wine._id}
                         style={{ flex: 1, padding: '8px 5px', fontSize: '0.95rem', color: '#B49A65', borderColor: '#EAE6DF' }}
                       >
-                        {sharingId === wine._id ? '⏳' : 'שתף 📤'}
+                        {sharingId === wine._id ? '⏳' : 'שתף'}
                       </button>
                       <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9', padding: '8px 5px', fontSize: '0.95rem' }}>מחיקה</button>
                     </div>
