@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import heic2any from 'heic2any'
+import { useState, useEffect } from 'react';
+import heic2any from 'heic2any';
+import html2canvas from 'html2canvas';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 function App() {
@@ -29,7 +30,10 @@ function App() {
   const [sortOption, setSortOption] = useState('dateDrank_desc');
   
   const [selectedGraphYear, setSelectedGraphYear] = useState(new Date().getFullYear());
-  const [zoomedImage, setZoomedImage] = useState(null); // מצב חדש להגדלת תמונה
+
+  // מצבים חדשים עבור הפיצ'רים שהוספנו
+  const [expandedCards, setExpandedCards] = useState({});
+  const [sharingId, setSharingId] = useState(null);
 
   const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000' 
@@ -201,6 +205,118 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // פונקציה לפתיחה וסגירה של כרטיסייה (הצגת הסומלייה והרדאר)
+  const toggleCard = (id) => {
+    setExpandedCards(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  // פונקציה ליצירת תמונה לשיתוף (9:16)
+  const generateShareImage = async (wine) => {
+    setSharingId(wine._id);
+    try {
+      // יצירת קונטיינר מוסתר עם עיצוב מדויק
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.top = '-10000px';
+      container.style.right = '-10000px';
+      container.style.width = '540px'; // פרופורציה של 9
+      container.style.height = '960px'; // פרופורציה של 16
+      container.style.backgroundColor = '#F4F2EE';
+      container.style.direction = 'rtl';
+      container.style.fontFamily = "'Assistant', sans-serif";
+      container.style.display = 'flex';
+      container.style.flexDirection = 'column';
+      container.style.boxSizing = 'border-box';
+
+      // חלק עליון: תמונה
+      let imgHtml = '<div style="height: 40%; background-color: #F8F7F5; display: flex; align-items: center; justify-content: center;"><span style="color: #BCAFA4; font-size: 1.5rem;">ללא תמונה</span></div>';
+      if (wine.imageUrl) {
+        imgHtml = `
+          <div style="height: 42%; background-color: #F8F7F5; display: flex; align-items: center; justify-content: center; padding: 25px 0;">
+            <img src="${wine.imageUrl}" crossorigin="anonymous" style="max-height: 100%; max-width: 100%; object-fit: contain; filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1));" />
+          </div>
+        `;
+      }
+
+      // ציון אם קיים
+      const ratingHtml = wine.rating && wine.bottleStatus === 'drank'
+        ? `<div style="color: #B49A65; font-size: 2rem; font-weight: bold; margin-bottom: 5px;">${wine.rating} ★</div>`
+        : '';
+
+      // תגית סוג היין (עם צבע מתאים)
+      const typeStyleObj = getWineTypeStyle(wine.wineType);
+      const typeLabel = `<span style="display: inline-block; background-color: ${typeStyleObj.color}; color: white; padding: 6px 16px; border-radius: 50px; font-size: 1.1rem; font-weight: bold; margin-bottom: 20px;">${wine.wineType}</span>`;
+
+      // רשמים וזיכרון אם קיימים
+      let notesHtml = '';
+      if (wine.tastingNotes && wine.bottleStatus === 'drank') {
+        notesHtml = `
+          <div style="margin-top: 15px;">
+            <span style="color: #9C898E; font-size: 1rem; display: block; margin-bottom: 5px;">רשמים מהטעימה:</span>
+            <p style="margin: 0; font-size: 1.25rem; line-height: 1.5; color: #332F2C;">${wine.tastingNotes}</p>
+          </div>
+        `;
+      }
+
+      let memoryHtml = '';
+      if (wine.memory && wine.bottleStatus === 'drank') {
+        memoryHtml = `
+          <div style="margin-top: 15px; padding: 15px; background-color: #FFFFFF; border-radius: 16px; border: 1px solid #EAE6DF;">
+            <span style="color: #B49A65; font-size: 0.95rem; display: block; margin-bottom: 5px;">זיכרון מהחוויה:</span>
+            <p style="margin: 0; font-size: 1.2rem; line-height: 1.5; font-style: italic; color: #5A5A5A;">"${wine.memory}"</p>
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        ${imgHtml}
+        <div style="padding: 35px 40px; flex: 1; display: flex; flex-direction: column;">
+          ${ratingHtml}
+          <h2 style="margin: 0 0 10px 0; color: #2B2624; font-size: 2.4rem; font-family: 'Frank Ruhl Libre', serif; line-height: 1.15;">${wine.name}</h2>
+          <p style="color: #7D736A; font-size: 1.25rem; margin: 0 0 15px 0;">
+            ${getCountryFlag(wine.country)} ${wine.country || ''} • ${wine.producer || ''} ${wine.vintage ? `• ${wine.vintage}` : ''}
+          </p>
+          <div>${typeLabel} ${wine.isNatural ? `<span style="display: inline-block; background-color: #4A5D23; color: white; padding: 6px 16px; border-radius: 50px; font-size: 1.1rem; font-weight: bold; margin-bottom: 20px; margin-right: 10px;">טבעי</span>` : ''}</div>
+          
+          ${notesHtml}
+          ${memoryHtml}
+          
+          <div style="margin-top: auto; text-align: center; padding-top: 20px; border-top: 1px solid #EAE6DF; display: flex; justify-content: center; align-items: center; gap: 10px;">
+            <h3 style="margin: 0; font-family: 'Frank Ruhl Libre', serif; color: #572C3A; font-size: 1.4rem;">מרתף היין</h3>
+            <span style="color: #B49A65; font-size: 1.1rem; font-family: 'Frank Ruhl Libre', serif; font-style: italic;">של עילי וגילי</span>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(container);
+
+      // מחכים חצי שנייה כדי לוודא שהתמונה מ-Cloudinary נטענה ב-DOM המוסתר
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const canvas = await html2canvas(container, {
+        useCORS: true,
+        scale: 2, // איכות גבוהה יותר לשיתוף
+        backgroundColor: '#F4F2EE',
+        logging: false
+      });
+
+      const link = document.createElement('a');
+      link.download = `Share_${wine.name.replace(/\s+/g, '_')}.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 0.9);
+      link.click();
+
+      document.body.removeChild(container);
+    } catch (error) {
+      console.error('Error generating image:', error);
+      alert('שגיאה ביצירת התמונה לשיתוף. נסה שוב.');
+    } finally {
+      setSharingId(null);
+    }
+  };
+
   const formatPerfectDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -217,6 +333,8 @@ function App() {
       case 'לבן': return { color: '#8A7A40', backgroundColor: '#FDFDF2' }; 
       case 'כתום': return { color: '#B35A22', backgroundColor: '#FEF8F3' }; 
       case 'רוזה': return { color: '#B06D7B', backgroundColor: '#FDF6F8' }; 
+      case 'מבעבע': return { color: '#B89B48', backgroundColor: '#FEFCF4' }; // זהב בהיר למבעבע
+      case 'סאקה': return { color: '#5A7D8F', backgroundColor: '#F2F6F9' }; // תכלת-אפרפר לסאקה
       default: return { color: '#5A5A5A', backgroundColor: '#F9F9F9' };
     }
   };
@@ -224,6 +342,7 @@ function App() {
   const getCountryFlag = (country) => {
     if (!country) return '';
     const name = country.toLowerCase().trim();
+    // הרשימה המקורית
     if (name.includes('ישראל')) return '🇮🇱';
     if (name.includes('צרפת')) return '🇫🇷';
     if (name.includes('איטליה')) return '🇮🇹';
@@ -252,6 +371,29 @@ function App() {
     if (name.includes('אורוגוואי') || name.includes('אורוגואי')) return '🇺🇾';
     if (name.includes('אנגליה') || name.includes('בריטניה')) return '🇬🇧';
     if (name.includes('קנדה')) return '🇨🇦';
+    
+    // הרשימה החדשה - 20 מדינות גדולות וחשובות
+    if (name.includes('יפן')) return '🇯🇵';
+    if (name.includes('סין')) return '🇨🇳';
+    if (name.includes('הודו')) return '🇮🇳';
+    if (name.includes('ברזיל')) return '🇧🇷';
+    if (name.includes('מקסיקו')) return '🇲🇽';
+    if (name.includes('רוסיה')) return '🇷🇺';
+    if (name.includes('דרום קוריאה') || name.includes('קוריאה הדרומית')) return '🇰🇷';
+    if (name.includes('טורקיה')) return '🇹🇷';
+    if (name.includes('פולין')) return '🇵🇱';
+    if (name.includes('הולנד')) return '🇳🇱';
+    if (name.includes('בלגיה')) return '🇧🇪';
+    if (name.includes('שוודיה')) return '🇸🇪';
+    if (name.includes('אירלנד')) return '🇮🇪';
+    if (name.includes('נורווגיה') || name.includes('נורבגיה')) return '🇳🇴';
+    if (name.includes('דנמרק')) return '🇩🇰';
+    if (name.includes('צ\'כיה') || name.includes('צכיה')) return '🇨🇿';
+    if (name.includes('פינלנד')) return '🇫🇮';
+    if (name.includes('קולומביה')) return '🇨🇴';
+    if (name.includes('פרו')) return '🇵🇪';
+    if (name.includes('תאילנד')) return '🇹🇭';
+
     return '';
   };
 
@@ -328,12 +470,11 @@ function App() {
         countryRatings[w.country].count += 1;
       }
     });
-    // שיניתי כאן ל-10 מדינות במקום 5
     const countryAverages = Object.keys(countryRatings).map(c => ({
       name: c,
       avg: (countryRatings[c].sum / countryRatings[c].count).toFixed(1),
       count: countryRatings[c].count
-    })).sort((a,b) => b.avg - a.avg).slice(0, 10); 
+    })).sort((a,b) => b.avg - a.avg).slice(0, 5); 
 
     const yearsSet = new Set(drankWines.map(w => {
       const dStr = w.dateDrank || w.dateOpened;
@@ -371,19 +512,6 @@ function App() {
   };
 
   const stats = calculateStats();
-
-  // חישוב כמות היינות הפעילים בלשונית הנוכחית כדי להציג בתוך הסוגריים שבסינון
-  const winesInCurrentTab = winesList.filter(w => (cellarTab === 'stored' ? w.bottleStatus === 'stored' : w.bottleStatus !== 'stored'));
-  
-  const getTypeCount = (type) => {
-    if (type === 'הכל') return winesInCurrentTab.length;
-    return winesInCurrentTab.filter(w => w.wineType === type).length;
-  };
-
-  const getCountryCount = (country) => {
-    if (country === 'הכל') return winesInCurrentTab.length;
-    return winesInCurrentTab.filter(w => w.country === country).length;
-  };
 
   const getSortedAndFilteredWines = () => {
     let result = winesList.filter(wine => {
@@ -607,11 +735,36 @@ function App() {
       cursor: pointer;
       transition: all 0.3s ease;
     }
-    .btn-pill-outline:hover {
+    .btn-pill-outline:hover:not(:disabled) {
       border-color: #572C3A;
       background-color: #FDFBF7;
     }
+    .btn-pill-outline:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
     
+    .toggle-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 15px;
+      background-color: #F8F7F5;
+      border: 1px solid #EAE6DF;
+      color: #572C3A;
+      font-weight: bold;
+      cursor: pointer;
+      font-family: 'Assistant', sans-serif;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    .toggle-btn:hover {
+      background-color: #EAE6DF;
+    }
+
     .recharts-tooltip-wrapper { direction: rtl; }
     
     .cellar-tabs {
@@ -776,6 +929,8 @@ function App() {
                     <option value="לבן">לבן</option>
                     <option value="כתום">כתום</option>
                     <option value="רוזה">רוזה</option>
+                    <option value="מבעבע">מבעבע</option>
+                    <option value="סאקה">סאקה</option>
                   </select>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '28px' }}>
@@ -938,11 +1093,13 @@ function App() {
               onChange={(e) => setFilterType(e.target.value)}
               className="filter-select"
             >
-              <option value="הכל">כל הסוגים ({getTypeCount('הכל')})</option>
-              <option value="אדום">אדום ({getTypeCount('אדום')})</option>
-              <option value="לבן">לבן ({getTypeCount('לבן')})</option>
-              <option value="כתום">כתום ({getTypeCount('כתום')})</option>
-              <option value="רוזה">רוזה ({getTypeCount('רוזה')})</option>
+              <option value="הכל">כל הסוגים</option>
+              <option value="אדום">אדום</option>
+              <option value="לבן">לבן</option>
+              <option value="כתום">כתום</option>
+              <option value="רוזה">רוזה</option>
+              <option value="מבעבע">מבעבע</option>
+              <option value="סאקה">סאקה</option>
             </select>
 
             <select 
@@ -951,9 +1108,7 @@ function App() {
               className="filter-select"
             >
               {uniqueCountries.map(country => (
-                <option key={country} value={country}>
-                  {country === 'הכל' ? 'כל המדינות' : country} ({getCountryCount(country)})
-                </option>
+                <option key={country} value={country}>{country === 'הכל' ? 'כל המדינות' : country}</option>
               ))}
             </select>
 
@@ -989,11 +1144,7 @@ function App() {
                 
                 <div style={{ padding: '20px', backgroundColor: '#F8F7F5', display: 'flex', justifyContent: 'center', position: 'relative' }}>
                   {wine.imageUrl ? (
-                     <img 
-                      src={wine.imageUrl} 
-                      onClick={() => setZoomedImage(wine.imageUrl)}
-                      style={{ width: '100%', height: '280px', objectFit: 'contain', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.1))', cursor: 'zoom-in' }} 
-                     />
+                     <img src={wine.imageUrl} style={{ width: '100%', height: '280px', objectFit: 'contain', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.1))' }} />
                   ) : (
                      <div style={{ width: '100%', height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#BCAFA4' }}>ללא תמונה</div>
                   )}
@@ -1038,35 +1189,11 @@ function App() {
                     ) : null}
                   </div>
 
-                  <div style={{ marginBottom: '30px', padding: '10px', backgroundColor: '#FFFFFF', borderRadius: '20px', display: 'flex', justifyContent: 'center' }}>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                        <PolarGrid stroke="#EAE6DF" />
-                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#7D736A', fontSize: 13, fontFamily: 'Assistant', fontWeight: 'bold' }} />
-                        <PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false} />
-                        <Tooltip 
-                          formatter={(value) => [value, 'דירוג']}
-                          labelFormatter={(label, payload) => payload?.[0]?.payload?.originalName || label}
-                          contentStyle={{ backgroundColor: '#FDFBF7', border: '1px solid #EAE6DF', borderRadius: '8px', color: '#332F2C', direction: 'rtl', fontFamily: 'Assistant' }}
-                          itemStyle={{ color: '#572C3A', fontWeight: 'bold' }}
-                        />
-                        <Radar name="פרופיל טעם" dataKey="A" stroke="#572C3A" fill="#572C3A" fillOpacity={0.2} dot={{ r: 4, fill: '#572C3A', stroke: '#FFFFFF', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#B49A65', stroke: '#FFFFFF' }} />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </div>
-
                   {wine.bottleStatus === 'drank' && (
                     <div style={{ padding: '20px', backgroundColor: '#F8F7F5', borderRadius: '20px', marginBottom: '25px' }}>
                       {wine.dateDrank && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}><span style={{ color: '#9C898E', fontSize: '0.95rem' }}>תאריך:</span> <span style={{ fontWeight: '600' }}>{formatPerfectDate(wine.dateDrank)}</span></div>}
                       {wine.location && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}><span style={{ color: '#9C898E', fontSize: '0.95rem' }}>מקום:</span> <span style={{ fontWeight: '600' }}>{wine.location}</span></div>}
                       {wine.drankWith && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#9C898E', fontSize: '0.95rem' }}>שותפים:</span> <span style={{ fontWeight: '600' }}>{wine.drankWith}</span></div>}
-                    </div>
-                  )}
-
-                  {wine.aiInsights && (
-                    <div style={{ marginBottom: '25px' }}>
-                      <span className="serif-title" style={{ color: '#B49A65', fontSize: '1rem', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>הסומלייה הדיגיטלי</span>
-                      <p className="rtl-textarea" style={{ margin: 0, fontSize: '1rem', lineHeight: '1.6', color: '#5A5A5A', whiteSpace: 'pre-wrap' }}>{wine.aiInsights}</p>
                     </div>
                   )}
 
@@ -1084,16 +1211,62 @@ function App() {
                     </div>
                   )}
 
+                  {/* אזור נפתח / נסגר (Drop-down) לסומלייה ולרדאר */}
+                  <div style={{ marginTop: '5px', marginBottom: '25px' }}>
+                    <button 
+                      onClick={() => toggleCard(wine._id)} 
+                      className="toggle-btn"
+                    >
+                      {expandedCards[wine._id] ? '🔼 הסתר סומלייה ופרופיל טעמים' : '🔽 הצג סומלייה ופרופיל טעמים'}
+                    </button>
+
+                    {expandedCards[wine._id] && (
+                      <div style={{ animation: 'fadeIn 0.3s ease', marginTop: '20px' }}>
+                        {wine.aiInsights && (
+                          <div style={{ marginBottom: '25px' }}>
+                            <span className="serif-title" style={{ color: '#B49A65', fontSize: '1rem', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>הסומלייה הדיגיטלי</span>
+                            <p className="rtl-textarea" style={{ margin: 0, fontSize: '1rem', lineHeight: '1.6', color: '#5A5A5A', whiteSpace: 'pre-wrap' }}>{wine.aiInsights}</p>
+                          </div>
+                        )}
+
+                        <div style={{ padding: '10px', backgroundColor: '#FFFFFF', borderRadius: '20px', display: 'flex', justifyContent: 'center' }}>
+                          <ResponsiveContainer width="100%" height={220}>
+                            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                              <PolarGrid stroke="#EAE6DF" />
+                              <PolarAngleAxis dataKey="subject" tick={{ fill: '#7D736A', fontSize: 13, fontFamily: 'Assistant', fontWeight: 'bold' }} />
+                              <PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false} />
+                              <Tooltip 
+                                formatter={(value) => [value, 'דירוג']}
+                                labelFormatter={(label, payload) => payload?.[0]?.payload?.originalName || label}
+                                contentStyle={{ backgroundColor: '#FDFBF7', border: '1px solid #EAE6DF', borderRadius: '8px', color: '#332F2C', direction: 'rtl', fontFamily: 'Assistant' }}
+                                itemStyle={{ color: '#572C3A', fontWeight: 'bold' }}
+                              />
+                              <Radar name="פרופיל טעם" dataKey="A" stroke="#572C3A" fill="#572C3A" fillOpacity={0.2} dot={{ r: 4, fill: '#572C3A', stroke: '#FFFFFF', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#B49A65', stroke: '#FFFFFF' }} />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid #EAE6DF' }}>
                     <div style={{ marginBottom: '15px', color: '#9C898E', fontSize: '0.85rem' }}>
                       נוסף למערכת: {formatPerfectDate(wine.dateOpened)}
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {wine.bottleStatus === 'stored' && (
-                        <button className="btn-pill-primary" onClick={() => openBottle(wine)} style={{ flex: 2, padding: '10px', fontSize: '1.05rem' }}>פתיחת בקבוק</button>
+                        <button className="btn-pill-primary" onClick={() => openBottle(wine)} style={{ flex: '1 1 100%', padding: '10px', fontSize: '1.05rem', marginBottom: '8px' }}>פתיחת בקבוק</button>
                       )}
-                      <button className="btn-pill-outline" onClick={() => editWine(wine)} style={{ flex: 1, padding: '10px' }}>עריכה</button>
-                      <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9', padding: '10px' }}>מחיקה</button>
+                      <button className="btn-pill-outline" onClick={() => editWine(wine)} style={{ flex: 1, padding: '8px 5px', fontSize: '0.95rem' }}>עריכה</button>
+                      <button 
+                        className="btn-pill-outline" 
+                        onClick={() => generateShareImage(wine)} 
+                        disabled={sharingId === wine._id}
+                        style={{ flex: 1, padding: '8px 5px', fontSize: '0.95rem', color: '#B49A65', borderColor: '#EAE6DF' }}
+                      >
+                        {sharingId === wine._id ? '⏳' : 'שתף 📤'}
+                      </button>
+                      <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9', padding: '8px 5px', fontSize: '0.95rem' }}>מחיקה</button>
                     </div>
                   </div>
                 </div>
@@ -1109,7 +1282,6 @@ function App() {
           
           {stats ? (
             <>
-              {/* 1. סה"כ יינות - חלוקה - טבעי */}
               <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6', textAlign: 'center' }}>
                 <h3 className="serif-title" style={{ margin: '0 0 10px 0', fontSize: '1.5rem', color: '#572C3A' }}>סה״כ יינות במערכת</h3>
                 <span style={{ color: '#B49A65', fontSize: '4.5rem', fontWeight: 'bold', lineHeight: '1', display: 'block', marginBottom: '25px' }}>{stats.totalWines}</span>
@@ -1130,7 +1302,6 @@ function App() {
                 </div>
               </div>
 
-              {/* 2 & 3. סוג היין המועדף ומחיר ממוצע */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
                 <div className="stat-card">
                   <span style={{ color: '#572C3A', fontSize: '2.5rem', fontWeight: 'bold', lineHeight: '1' }}>{stats.favoriteType || '-'}</span>
@@ -1142,7 +1313,6 @@ function App() {
                 </div>
               </div>
 
-              {/* 4. המדינה המובילה */}
               <div className="soft-card" style={{ padding: '25px', textAlign: 'center', border: '1px solid #EFECE6' }}>
                 <p style={{ margin: '0 0 5px 0', color: '#7D736A', fontSize: '1.1rem' }}>המדינה המובילה באוסף</p>
                 <p className="serif-title" style={{ margin: 0, fontSize: '1.8rem', color: '#572C3A', fontWeight: 'bold' }}>
@@ -1150,7 +1320,6 @@ function App() {
                 </p>
               </div>
 
-              {/* 5. ממוצע ציונים הכללי */}
               <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
                 <div style={{ textAlign: 'center', marginBottom: '25px', paddingBottom: '20px', borderBottom: '1px solid #EAE6DF' }}>
                   <span style={{ color: '#7D736A', fontSize: '1.1rem', display: 'block', marginBottom: '5px' }}>ממוצע הציונים הכללי</span>
@@ -1178,7 +1347,6 @@ function App() {
                 )}
               </div>
 
-              {/* 6. כמות יינות לפי מדינה */}
               <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
                 <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>כמות יינות לפי מדינה</h3>
                 {stats.topCountriesVolume && stats.topCountriesVolume.length > 0 ? (
@@ -1202,7 +1370,6 @@ function App() {
                 )}
               </div>
 
-              {/* 7 & 8. הענב המוביל והמקומות הפופולריים */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
                 <div className="soft-card" style={{ padding: '30px', textAlign: 'center', border: '1px solid #EFECE6', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <p style={{ margin: '0 0 15px 0', color: '#7D736A', fontSize: '1.2rem' }}>הענב המוביל</p>
@@ -1229,7 +1396,6 @@ function App() {
                 </div>
               </div>
 
-              {/* 9. יין הדגל */}
               <div>
                 {stats.bestWine ? (
                   <div className="soft-card" style={{ padding: '30px', backgroundColor: '#FDFBF7', border: '1px solid #EFECE6', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -1251,7 +1417,6 @@ function App() {
                 )}
               </div>
 
-              {/* 10. הגרף של היסטוריית שתייה */}
               {stats.graphData && stats.graphData.length > 0 && (
                 <div className="soft-card" style={{ padding: '30px', backgroundColor: '#FFFFFF', border: '1px solid #EFECE6' }}>
                   <h3 className="serif-title" style={{ margin: '0 0 15px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>היסטוריית בקבוקים שנפתחו</h3>
@@ -1294,30 +1459,6 @@ function App() {
         </div>
       )}
 
-      {/* אזור להצגת התמונה בהגדלה */}
-      {zoomedImage && (
-        <div 
-          style={{
-            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
-            backgroundColor: 'rgba(0, 0, 0, 0.85)', zIndex: 1000, 
-            display: 'flex', justifyContent: 'center', alignItems: 'center',
-            cursor: 'zoom-out', padding: '20px', boxSizing: 'border-box'
-          }}
-          onClick={() => setZoomedImage(null)}
-        >
-          <img 
-            src={zoomedImage} 
-            style={{
-              maxHeight: '90vh', maxWidth: '100%', objectFit: 'contain', 
-              borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
-            }} 
-          />
-          <div style={{ position: 'absolute', top: '20px', right: '30px', color: 'white', fontSize: '2.5rem', fontWeight: 'bold', cursor: 'pointer' }}>
-            &times;
-          </div>
-        </div>
-      )}
-
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
@@ -1329,5 +1470,4 @@ function App() {
 }
 
 const labelStyle = { fontSize: '0.9rem', color: '#7D736A', marginBottom: '8px', display: 'block', fontWeight: '600' };
-
-export default App
+export default App;
