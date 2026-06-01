@@ -297,6 +297,7 @@ function App() {
 
       document.body.appendChild(container);
 
+      // המתנה לטעינת תמונות הרשת
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const canvas = await html2canvas(container, {
@@ -306,12 +307,34 @@ function App() {
         logging: false
       });
 
-      const link = document.createElement('a');
-      link.download = `Share_${wine.name.replace(/\s+/g, '_')}.jpg`;
-      link.href = canvas.toDataURL('image/jpeg', 0.9);
-      link.click();
-
+      // הפיכת הקנבס לקובץ תמונה אמיתי
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
       document.body.removeChild(container);
+
+      if (blob) {
+        const file = new File([blob], `Share_${wine.name.replace(/\s+/g, '_')}.jpg`, { type: 'image/jpeg' });
+
+        // בדיקה האם המכשיר תומך בשיתוף מובנה (כמו אייפון)
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: wine.name,
+              text: `🍷 יין מהמרתף של עילי וגילי: ${wine.name}`
+            });
+          } catch (error) {
+            console.log('Share canceled or failed', error);
+          }
+        } else {
+          // אם אין תמיכה (למשל במחשב), פשוט נוריד את הקובץ
+          const link = document.createElement('a');
+          link.download = file.name;
+          link.href = URL.createObjectURL(blob);
+          link.click();
+          URL.revokeObjectURL(link.href);
+        }
+      }
+
     } catch (error) {
       console.error('Error generating image:', error);
       alert('שגיאה ביצירת התמונה לשיתוף. נסה שוב.');
@@ -397,10 +420,6 @@ function App() {
 
     return '';
   };
-
-  // בדיקת מכשיר אפל (iOS) כדי לדעת אם צריך להפוך את הטקסט בגרפים
-  const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-  const fixHebrewSVG = (str) => isIOS ? str.split('').reverse().join('') : str;
 
   const uniqueCountries = ['הכל', ...new Set(winesList.map(w => w.country).filter(c => c && c.trim() !== ''))].sort();
 
@@ -506,7 +525,6 @@ function App() {
       const key = `${selectedGraphYear}-${monthStr}`;
       return { 
         name: monthName, 
-        displayName: fixHebrewSVG(monthName), // לגרף עצמו
         בקבוקים: monthCounts[key] || 0 
       };
     });
@@ -894,7 +912,6 @@ function App() {
       margin-top: 10px;
     }
 
-    /* התאמות מיוחדות למסכים קטנים (טלפונים) */
     @media (max-width: 600px) {
       .nav-item {
         padding: 8px 15px;
@@ -1225,13 +1242,12 @@ function App() {
             {sortedAndFilteredWines.map((wine) => {
               const typeStyle = getWineTypeStyle(wine.wineType);
               
-              // הגדרת נתוני הרדאר והפיכת הטקסט במידה וזה אייפון
               const radarData = [
-                { subject: fixHebrewSVG('חומציות'), originalName: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
-                { subject: fixHebrewSVG('מתיקות'), originalName: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
-                { subject: fixHebrewSVG('גוף'), originalName: 'גוף', A: Number(wine.body) || 1, fullMark: 5 },
-                { subject: fixHebrewSVG('טאנינים'), originalName: 'טאנינים', A: Number(wine.tannins) || 1, fullMark: 5 },
-                { subject: fixHebrewSVG('אלכוהול'), originalName: 'אלכוהול', A: Number(wine.alcohol) || 1, fullMark: 5 },
+                { subject: 'חומציות', originalName: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
+                { subject: 'מתיקות', originalName: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
+                { subject: 'גוף', originalName: 'גוף', A: Number(wine.body) || 1, fullMark: 5 },
+                { subject: 'טאנינים', originalName: 'טאנינים', A: Number(wine.tannins) || 1, fullMark: 5 },
+                { subject: 'אלכוהול', originalName: 'אלכוהול', A: Number(wine.alcohol) || 1, fullMark: 5 },
               ];
               
               return (
@@ -1532,7 +1548,7 @@ function App() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={stats.graphData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#EAE6DF" vertical={false} />
-                        <XAxis dataKey="displayName" stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} axisLine={false} tickLine={false} />
+                        <XAxis dataKey="name" stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} axisLine={false} tickLine={false} />
                         <YAxis stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} axisLine={false} tickLine={false} allowDecimals={false} />
                         <Tooltip 
                           formatter={(value) => [value, 'בקבוקים']}
