@@ -165,7 +165,6 @@ function App() {
         method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData)
       });
       
-      // טיפול תקין בשגיאות כדי שהמערכת לעולם לא "תיתקע"
       if (response.ok) {
         setEditingId(null);
         
@@ -562,6 +561,10 @@ function App() {
   const modernStyles = `
     @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600&family=Frank+Ruhl+Libre:wght@300;400;700&display=swap');
 
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       background-color: #F4F2EE;
       color: #332F2C;
@@ -569,6 +572,7 @@ function App() {
       margin: 0;
       padding: 0;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
     .serif-title { font-family: 'Frank Ruhl Libre', serif; }
@@ -580,6 +584,7 @@ function App() {
       top: 20px;
       z-index: 100;
       margin-bottom: 40px;
+      padding: 0 10px;
     }
     
     .nav-pill {
@@ -589,6 +594,14 @@ function App() {
       border-radius: 50px;
       padding: 6px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      max-width: 100%;
+      overflow-x: auto;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    
+    .nav-pill::-webkit-scrollbar {
+      display: none;
     }
 
     .nav-item {
@@ -599,6 +612,7 @@ function App() {
       font-size: 1.05rem;
       transition: all 0.3s ease;
       color: #7D736A;
+      white-space: nowrap;
     }
 
     .nav-item.active {
@@ -642,6 +656,11 @@ function App() {
       transition: all 0.4s ease;
       overflow: hidden;
       width: 100%;
+      min-width: 0;
+    }
+
+    .scan-card {
+      padding: 40px;
     }
 
     .stat-card {
@@ -834,6 +853,44 @@ function App() {
       font-size: 0.8rem;
       margin-top: 4px;
     }
+
+    .responsive-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .responsive-grid-complex {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      background-color: #F8F7F5;
+      padding: 20px;
+      border-radius: 24px;
+      margin-top: 10px;
+    }
+
+    /* התאמות מיוחדות למסכים קטנים (טלפונים) */
+    @media (max-width: 600px) {
+      .nav-item {
+        padding: 8px 15px;
+        font-size: 0.95rem;
+      }
+      .responsive-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+      .responsive-grid-complex {
+        grid-template-columns: 1fr;
+        padding: 15px;
+      }
+      .scan-card {
+        padding: 20px;
+      }
+      .filter-panel {
+        flex-direction: column;
+      }
+    }
   `;
 
   return (
@@ -862,7 +919,7 @@ function App() {
       {currentView === 'scan' && (
         <div style={{ animation: 'fadeIn 0.5s ease' }}>
           
-          <div className="soft-card" style={{ padding: '40px' }}>
+          <div className="soft-card scan-card">
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               
               <div style={{ textAlign: 'center', marginBottom: '10px' }}>
@@ -912,12 +969,12 @@ function App() {
                 <input className="soft-input" name="producer" value={formData.producer} onChange={handleChange} />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div className="responsive-grid">
                 <div><label style={labelStyle}>מדינה</label><input className="soft-input" name="country" value={formData.country} onChange={handleChange} /></div>
                 <div><label style={labelStyle}>אזור</label><input className="soft-input" name="region" value={formData.region} onChange={handleChange} /></div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div className="responsive-grid">
                 <div><label style={labelStyle}>זני ענבים</label><input className="soft-input" name="grapes" value={formData.grapes} onChange={handleChange} /></div>
                 <div><label style={labelStyle}>שנת בציר</label><input className="soft-input" type="number" name="vintage" value={formData.vintage} onChange={handleChange} /></div>
               </div>
@@ -927,7 +984,7 @@ function App() {
                 <input className="soft-input" name="drinkWindow" value={formData.drinkWindow || ''} onChange={handleChange} placeholder="לדוגמה: 2024-2028 או מוכן לשתייה" />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', backgroundColor: '#F8F7F5', padding: '20px', borderRadius: '24px' }}>
+              <div className="responsive-grid-complex">
                 <div>
                   <label style={labelStyle}>סוג יין</label>
                   <select className="soft-input" name="wineType" value={formData.wineType} onChange={handleChange} style={{ backgroundColor: '#fff' }}>
@@ -945,7 +1002,7 @@ function App() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '20px', backgroundColor: '#F8F7F5', borderRadius: '24px', marginTop: '10px' }}>
+              <div className="responsive-grid-complex">
                 <div>
                   <label style={labelStyle}>מחיר (₪)</label>
                   <input 
@@ -1024,7 +1081,7 @@ function App() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <div className="responsive-grid">
                     <div>
                       <label style={labelStyle}>תאריך טעימה</label>
                       <input className="soft-input" type="date" name="dateDrank" value={formData.dateDrank || ''} onChange={handleChange} />

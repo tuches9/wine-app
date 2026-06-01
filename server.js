@@ -76,6 +76,18 @@ const wineSchema = new mongoose.Schema({
 
 const Wine = mongoose.model('Wine', wineSchema);
 
+const getWineTypeIcon = (type) => {
+  switch (type) {
+    case 'אדום': return '🍷 יין אדום';
+    case 'לבן': return '🥂 יין לבן';
+    case 'כתום': return '🍊 יין כתום';
+    case 'רוזה': return '🌸 יין רוזה';
+    case 'מבעבע': return '🍾 יין מבעבע';
+    case 'סאקה': return '🍶 סאקה';
+    default: return '🍷 יין';
+  }
+};
+
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   console.log("--- מתחיל פענוח תווית יין ---");
   try {
@@ -171,14 +183,55 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
   }
 });
 
+// מסלול ליצירת יין חדש (כולל שליחת מייל)
 app.post('/api/wines', async (req, res) => {
   try {
     const newWine = new Wine(req.body);
     await newWine.save();
+    
+    // מחזירים תשובה ללקוח כדי לא לעכב את האפליקציה
     res.status(201).json({ message: 'Wine saved successfully!' });
+
+    // תהליך הרקע של המייל ליין חדש
+    if (process.env.RESEND_API_KEY) {
+      const wineIcon = getWineTypeIcon(newWine.wineType);
+      const updateTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+      
+      resend.emails.send({
+        from: 'onboarding@resend.dev',
+        to: 'ilaybittan@outlook.com',
+        subject: `🍷 מרתף היין: יין חדש נוסף - ${newWine.name}`,
+        html: `
+          <div dir="rtl" style="font-family: Arial, sans-serif; color: #332F2C; background-color: #F4F2EE; padding: 25px; border-radius: 12px; max-width: 600px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h1 style="color: #572C3A; margin: 0; font-size: 24px;">מרתף היין</h1>
+              <p style="color: #B49A65; font-style: italic; margin: 0;">של עילי וגילי</p>
+            </div>
+            
+            <p style="font-size: 16px;">יין חדש נוסף למערכת: <strong>${newWine.name}</strong></p>
+            <p style="font-size: 16px;">סוג היין: <strong>${wineIcon}</strong> ${newWine.isNatural ? '(טבעי 🌱)' : ''}</p>
+            
+            <div style="background-color: #FFFFFF; padding: 20px; border-radius: 12px; border: 1px solid #EAE6DF; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #B49A65; border-bottom: 2px solid #F4F2EE; padding-bottom: 10px;">פרטים כלליים:</h3>
+              <ul style="line-height: 1.6; padding-right: 0; list-style-type: none;">
+                <li style="margin-bottom: 8px;"><strong style="color: #572C3A;">יצרן:</strong> ${newWine.producer || 'לא צוין'}</li>
+                <li style="margin-bottom: 8px;"><strong style="color: #572C3A;">שנת בציר:</strong> ${newWine.vintage || 'לא צוין'}</li>
+                <li style="margin-bottom: 8px;"><strong style="color: #572C3A;">מדינה ואזור:</strong> ${newWine.country || ''} ${newWine.region ? `(${newWine.region})` : ''}</li>
+                <li style="margin-bottom: 8px;"><strong style="color: #572C3A;">סטטוס הבקבוק:</strong> ${newWine.bottleStatus === 'drank' ? 'נשתה 🍷' : 'שמור באוסף 🍾'}</li>
+              </ul>
+            </div>
+
+            <p style="font-size: 12px; color: #7D736A; text-align: center; border-top: 1px solid #EAE6DF; padding-top: 15px;">
+              ⏰ נוסף בתאריך: ${updateTime}
+            </p>
+          </div>
+        `
+      }).catch(e => console.error('❌ שגיאה בשליחת המייל דרך Resend (הוספה):', e));
+    }
+
   } catch (err) {
     console.error("❌ Error saving wine:", err);
-    res.status(500).json({ error: 'Error saving wine' });
+    if (!res.headersSent) res.status(500).json({ error: 'Error saving wine' });
   }
 });
 
@@ -191,49 +244,63 @@ app.get('/api/wines', async (req, res) => {
   }
 });
 
+// מסלול למחיקת יין (כולל שליחת מייל)
 app.delete('/api/wines/:id', async (req, res) => {
   try {
+    // שולפים את היין לפני המחיקה כדי שנדע מה השם שלו למייל
+    const wineToDelete = await Wine.findById(req.params.id);
+    
     await Wine.findByIdAndDelete(req.params.id);
     res.json({ message: 'Wine deleted successfully' });
+
+    // תהליך הרקע של המייל ליין שנמחק
+    if (process.env.RESEND_API_KEY && wineToDelete) {
+      const updateTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+      
+      resend.emails.send({
+        from: 'onboarding@resend.dev',
+        to: 'ilaybittan@outlook.com',
+        subject: `🗑️ מרתף היין: יין נמחק - ${wineToDelete.name}`,
+        html: `
+          <div dir="rtl" style="font-family: Arial, sans-serif; color: #332F2C; background-color: #F4F2EE; padding: 25px; border-radius: 12px; max-width: 600px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h1 style="color: #572C3A; margin: 0; font-size: 24px;">מרתף היין</h1>
+              <p style="color: #B49A65; font-style: italic; margin: 0;">של עילי וגילי</p>
+            </div>
+            
+            <p style="font-size: 16px;">היין <strong>${wineToDelete.name}</strong> הוסר לחלוטין מהמערכת.</p>
+            
+            <p style="font-size: 12px; color: #7D736A; text-align: center; border-top: 1px solid #EAE6DF; margin-top: 20px; padding-top: 15px;">
+              ⏰ נמחק בתאריך: ${updateTime}
+            </p>
+          </div>
+        `
+      }).catch(e => console.error('❌ שגיאה בשליחת המייל דרך Resend (מחיקה):', e));
+    }
+
   } catch (err) {
-    res.status(500).json({ error: 'Error deleting wine' });
+    console.error(err);
+    if (!res.headersSent) res.status(500).json({ error: 'Error deleting wine' });
   }
 });
 
-// פונקציית עזר לבחירת סמל בהתאם לסוג היין למייל
-const getWineTypeIcon = (type) => {
-  switch (type) {
-    case 'אדום': return '🍷 יין אדום';
-    case 'לבן': return '🥂 יין לבן';
-    case 'כתום': return '🍊 יין כתום';
-    case 'רוזה': return '🌸 יין רוזה';
-    case 'מבעבע': return '🍾 יין מבעבע';
-    case 'סאקה': return '🍶 סאקה';
-    default: return '🍷 יין';
-  }
-};
-
+// מסלול לעדכון יין קיים (כולל שליחת מייל משודרג)
 app.put('/api/wines/:id', async (req, res) => {
   console.log(`📬 הגיעה בקשת עריכה ליין: ${req.params.id}`);
   try {
-    // 1. שולפים את היין הישן לפני העדכון
     const oldWine = await Wine.findById(req.params.id);
     
-    // 2. מעדכנים ושולפים את הגרסה החדשה
     const updatedWine = await Wine.findByIdAndUpdate(
       req.params.id, 
       req.body, 
       { returnDocument: 'after' } 
     );
 
-    // 3. מחזירים מיד תשובה ללקוח כדי לא לתקוע את האפליקציה
     res.json(updatedWine);
 
-    // 4. תהליך הרקע ליצירת המייל המפורט
     if (process.env.RESEND_API_KEY && oldWine) {
       let changesHtml = '';
       
-      // הגדרת השדות שנרצה להשוות
       const fieldsToCheck = {
         name: 'שם היין', 
         producer: 'יצרן / Domaine', 
@@ -262,7 +329,6 @@ app.put('/api/wines/:id', async (req, res) => {
         let oldVal = oldWine[key];
         let newVal = updatedWine[key];
 
-        // טיפול במקרי קצה (ריק, undefined, סטטוס)
         if (oldVal === undefined || oldVal === null || oldVal === '') oldVal = 'ריק';
         if (newVal === undefined || newVal === null || newVal === '') newVal = 'ריק';
 
@@ -271,7 +337,6 @@ app.put('/api/wines/:id', async (req, res) => {
             newVal = newVal === 'drank' ? 'נשתה 🍷' : 'שמור באוסף 🍾';
         }
 
-        // אם יש הבדל, מוסיפים אותו לרשימה
         if (String(oldVal) !== String(newVal)) {
             changesHtml += `
               <li style="margin-bottom: 12px; padding: 10px; background-color: #F8F7F5; border-radius: 8px;">
@@ -284,9 +349,9 @@ app.put('/api/wines/:id', async (req, res) => {
       }
 
       if (changesHtml === '') {
-          changesHtml = '<p style="color: #7D736A; font-style: italic;">לא זוהו שינויים מהותיים בטקסט (ייתכן ועודכנה תמונה בלבד).</p>';
+          changesHtml = '<p style="color: #7D736A; font-style: italic; text-align: center;">לא זוהו שינויים מהותיים בטקסט.</p>';
       } else {
-          changesHtml = `<ul style="list-style-type: none; padding-right: 0;">${changesHtml}</ul>`;
+          changesHtml = `<ul style="list-style-type: none; padding-right: 0; margin: 0;">${changesHtml}</ul>`;
       }
 
       const updateTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
@@ -323,7 +388,6 @@ app.put('/api/wines/:id', async (req, res) => {
 
   } catch (err) {
     console.error("❌ Error updating wine:", err);
-    // רק במקרה של קריסה לפני ששלחנו את התשובה (נדיר עכשיו)
     if (!res.headersSent) {
       res.status(500).json({ error: 'Error updating wine' });
     }
