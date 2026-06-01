@@ -200,74 +200,120 @@ app.delete('/api/wines/:id', async (req, res) => {
   }
 });
 
+// פונקציית עזר לבחירת סמל בהתאם לסוג היין למייל
+const getWineTypeIcon = (type) => {
+  switch (type) {
+    case 'אדום': return '🍷 יין אדום';
+    case 'לבן': return '🥂 יין לבן';
+    case 'כתום': return '🍊 יין כתום';
+    case 'רוזה': return '🌸 יין רוזה';
+    case 'מבעבע': return '🍾 יין מבעבע';
+    case 'סאקה': return '🍶 סאקה';
+    default: return '🍷 יין';
+  }
+};
+
 app.put('/api/wines/:id', async (req, res) => {
   console.log(`📬 הגיעה בקשת עריכה ליין: ${req.params.id}`);
   try {
+    // 1. שולפים את היין הישן לפני העדכון
     const oldWine = await Wine.findById(req.params.id);
     
+    // 2. מעדכנים ושולפים את הגרסה החדשה
     const updatedWine = await Wine.findByIdAndUpdate(
       req.params.id, 
       req.body, 
       { returnDocument: 'after' } 
     );
 
-    let changesHtml = '';
-    const fieldsToCheck = {
-      name: 'שם היין', producer: 'יצרן', vintage: 'שנת בציר', 
-      bottleStatus: 'סטטוס הבקבוק', rating: 'ציון אישי', 
-      tastingNotes: 'רשמי טעימה', drinkWindow: 'חלון שתייה', 
-      aiInsights: 'הסומלייה הדיגיטלי (AI)', price: 'מחיר'
-    };
-
-    for (const key in fieldsToCheck) {
-      let oldVal = oldWine[key] || 'ריק';
-      let newVal = updatedWine[key] || 'ריק';
-      
-      if (key === 'bottleStatus') {
-          oldVal = oldVal === 'drank' ? 'נשתה 🍷' : 'שמור באוסף 🍾';
-          newVal = newVal === 'drank' ? 'נשתה 🍷' : 'שמור באוסף 🍾';
-      }
-
-      if (String(oldVal) !== String(newVal)) {
-          changesHtml += `
-            <li style="margin-bottom: 8px;">
-              <strong style="color: #572C3A;">${fieldsToCheck[key]}:</strong><br/>
-              <span style="color: #9C898E; text-decoration: line-through;">${oldVal}</span> 
-              <br/>➔ <span style="color: #332F2C; font-weight: bold;">${newVal}</span>
-            </li>
-          `;
-      }
-    }
-
-    if (changesHtml === '') {
-        changesHtml = '<li>עודכנו פרטים טכניים קטנים (השדות המרכזיים נותרו ללא שינוי).</li>';
-    }
-
-    const updateTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
-
+    // 3. מחזירים מיד תשובה ללקוח כדי לא לתקוע את האפליקציה
     res.json(updatedWine);
 
-    // שליחת המייל ברקע בעזרת Resend
-    if (process.env.RESEND_API_KEY) {
+    // 4. תהליך הרקע ליצירת המייל המפורט
+    if (process.env.RESEND_API_KEY && oldWine) {
+      let changesHtml = '';
+      
+      // הגדרת השדות שנרצה להשוות
+      const fieldsToCheck = {
+        name: 'שם היין', 
+        producer: 'יצרן / Domaine', 
+        vintage: 'שנת בציר', 
+        wineType: 'סוג היין',
+        country: 'מדינה',
+        region: 'אזור',
+        grapes: 'זני ענבים',
+        price: 'מחיר (₪)',
+        bottleStatus: 'סטטוס הבקבוק', 
+        rating: 'ציון אישי', 
+        tastingNotes: 'רשמי טעימה', 
+        drinkWindow: 'חלון שתייה', 
+        memory: 'זיכרון',
+        location: 'מיקום הטעימה',
+        drankWith: 'שותפים לטעימה',
+        aiInsights: 'הסומלייה הדיגיטלי (AI)',
+        acidity: 'חומציות (1-5)',
+        sweetness: 'מתיקות (1-5)',
+        body: 'גוף (1-5)',
+        tannins: 'טאנינים (1-5)',
+        alcohol: 'אלכוהול (1-5)'
+      };
+
+      for (const key in fieldsToCheck) {
+        let oldVal = oldWine[key];
+        let newVal = updatedWine[key];
+
+        // טיפול במקרי קצה (ריק, undefined, סטטוס)
+        if (oldVal === undefined || oldVal === null || oldVal === '') oldVal = 'ריק';
+        if (newVal === undefined || newVal === null || newVal === '') newVal = 'ריק';
+
+        if (key === 'bottleStatus') {
+            oldVal = oldVal === 'drank' ? 'נשתה 🍷' : 'שמור באוסף 🍾';
+            newVal = newVal === 'drank' ? 'נשתה 🍷' : 'שמור באוסף 🍾';
+        }
+
+        // אם יש הבדל, מוסיפים אותו לרשימה
+        if (String(oldVal) !== String(newVal)) {
+            changesHtml += `
+              <li style="margin-bottom: 12px; padding: 10px; background-color: #F8F7F5; border-radius: 8px;">
+                <strong style="color: #572C3A; display: block; font-size: 1.1em; margin-bottom: 4px;">${fieldsToCheck[key]}</strong>
+                <span style="color: #A34E4E; text-decoration: line-through;">${oldVal}</span> 
+                <br/>➔ <span style="color: #4A5D23; font-weight: bold;">${newVal}</span>
+              </li>
+            `;
+        }
+      }
+
+      if (changesHtml === '') {
+          changesHtml = '<p style="color: #7D736A; font-style: italic;">לא זוהו שינויים מהותיים בטקסט (ייתכן ועודכנה תמונה בלבד).</p>';
+      } else {
+          changesHtml = `<ul style="list-style-type: none; padding-right: 0;">${changesHtml}</ul>`;
+      }
+
+      const updateTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+      const wineIcon = getWineTypeIcon(updatedWine.wineType);
+
       resend.emails.send({
         from: 'onboarding@resend.dev',
         to: 'ilaybittan@outlook.com',
-        subject: `🍷 מרתף היין: עודכנו פרטים ל-${updatedWine.name}`,
+        subject: `🍷 מרתף היין: עדכון בבקבוק ${updatedWine.name}`,
         html: `
           <div dir="rtl" style="font-family: Arial, sans-serif; color: #332F2C; background-color: #F4F2EE; padding: 25px; border-radius: 12px; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #572C3A; margin-top: 0;">היי עילי!</h2>
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h1 style="color: #572C3A; margin: 0; font-size: 24px;">מרתף היין</h1>
+              <p style="color: #B49A65; font-style: italic; margin: 0;">של עילי וגילי</p>
+            </div>
+            
             <p style="font-size: 16px;">בוצע כעת עדכון ליין <strong>${updatedWine.name}</strong> במרתף.</p>
+            <p style="font-size: 16px; margin-bottom: 20px;">סוג היין: <strong>${wineIcon}</strong> ${updatedWine.isNatural ? '(טבעי 🌱)' : ''}</p>
             
             <div style="background-color: #FFFFFF; padding: 20px; border-radius: 12px; border: 1px solid #EAE6DF; margin: 20px 0;">
-              <h3 style="margin-top: 0; color: #B49A65; border-bottom: 2px solid #F4F2EE; padding-bottom: 10px;">מה בדיוק השתנה?</h3>
-              <ul style="line-height: 1.6; padding-right: 20px;">
-                ${changesHtml}
-              </ul>
+              <h3 style="margin-top: 0; color: #B49A65; border-bottom: 2px solid #F4F2EE; padding-bottom: 10px;">פירוט השינויים:</h3>
+              ${changesHtml}
             </div>
 
-            <p style="font-size: 14px; color: #7D736A;">⏰ עדכון זה בוצע בתאריך ${updateTime}</p>
-            <br/>
-            <p style="font-weight: bold; color: #572C3A;">לחיים! 🥂</p>
+            <p style="font-size: 12px; color: #7D736A; text-align: center; border-top: 1px solid #EAE6DF; padding-top: 15px;">
+              ⏰ עדכון זה בוצע בתאריך: ${updateTime}
+            </p>
           </div>
         `
       })
@@ -277,6 +323,7 @@ app.put('/api/wines/:id', async (req, res) => {
 
   } catch (err) {
     console.error("❌ Error updating wine:", err);
+    // רק במקרה של קריסה לפני ששלחנו את התשובה (נדיר עכשיו)
     if (!res.headersSent) {
       res.status(500).json({ error: 'Error updating wine' });
     }
