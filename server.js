@@ -77,8 +77,12 @@ const wineSchema = new mongoose.Schema({
 
 const Wine = mongoose.model('Wine', wineSchema);
 
+// הגדרות למייל עם תיקון ה-IPv6 והגדרות אבטחה של ג'ימייל
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
+  family: 4, // הכרחת שימוש ב-IPv4 כדי למנוע את שגיאת ENETUNREACH ברנדר
   auth: {
     user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASS  
@@ -143,9 +147,10 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     
     let wineData;
     try {
-        let cleanJsonString = responseText.replace(new RegExp('```json', 'g'), '');
-        cleanJsonString = cleanJsonString.replace(new RegExp('
-```', 'g'), '');
+        // התיקון שמונע שבירת שורות בהעתקה-הדבקה: יצירת התו בעזרת קוד ASCII במקום להקליד אותו
+        const backticks = String.fromCharCode(96, 96, 96);
+        let cleanJsonString = responseText.replace(new RegExp(backticks + 'json', 'g'), '');
+        cleanJsonString = cleanJsonString.replace(new RegExp(backticks, 'g'), '');
         cleanJsonString = cleanJsonString.trim();
         
         wineData = JSON.parse(cleanJsonString);
