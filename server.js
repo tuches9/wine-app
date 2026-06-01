@@ -77,12 +77,9 @@ const wineSchema = new mongoose.Schema({
 
 const Wine = mongoose.model('Wine', wineSchema);
 
-// הגדרות מתוקנות לחיבור יציב מ-Render שפותרות את בעיית ה-IPv6 נקודתית
+// חזרה להגדרות הבטוחות והרגילות של ג'ימייל
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  family: 4, // <-- השורה הזו פותרת את בעיית ה-IPv6 ספציפית למייל בלי לפגוע במסד הנתונים!
+  service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASS  
@@ -147,7 +144,8 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     
     let wineData;
     try {
-        const cleanJsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const cleanJsonString = responseText.replace(/```json/g, '').replace(/
+```/g, '').trim();
         wineData = JSON.parse(cleanJsonString);
     } catch (parseError) {
         console.error("❌ ה-AI לא החזיר JSON תקין:", responseText);
@@ -254,44 +252,44 @@ app.put('/api/wines/:id', async (req, res) => {
 
     const updateTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
 
-    try {
-      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-        const mailOptions = {
-          from: process.env.EMAIL_USER, 
-          to: 'ilaybittan@outlook.com', 
-          subject: `🍷 מרתף היין: עודכנו פרטים ל-${updatedWine.name}`,
-          html: `
-            <div dir="rtl" style="font-family: Arial, sans-serif; color: #332F2C; background-color: #F4F2EE; padding: 25px; border-radius: 12px; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #572C3A; margin-top: 0;">היי עילי!</h2>
-              <p style="font-size: 16px;">בוצע כעת עדכון ליין <strong>${updatedWine.name}</strong> במרתף.</p>
-              
-              <div style="background-color: #FFFFFF; padding: 20px; border-radius: 12px; border: 1px solid #EAE6DF; margin: 20px 0;">
-                <h3 style="margin-top: 0; color: #B49A65; border-bottom: 2px solid #F4F2EE; padding-bottom: 10px;">מה בדיוק השתנה?</h3>
-                <ul style="line-height: 1.6; padding-right: 20px;">
-                  ${changesHtml}
-                </ul>
-              </div>
+    // 1. קודם כל ולפני הכל - מחזירים תשובה מיידית לטלפון שלך כדי לא לתקוע את האפליקציה!
+    res.json(updatedWine);
 
-              <p style="font-size: 14px; color: #7D736A;">⏰ עדכון זה בוצע בתאריך ${updateTime}</p>
-              <br/>
-              <p style="font-weight: bold; color: #572C3A;">לחיים! 🥂</p>
+    // 2. תהליך הרקע הא-סינכרוני לשליחת המייל (לא מעכב את האפליקציה)
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      const mailOptions = {
+        from: process.env.EMAIL_USER, 
+        to: 'ilaybittan@outlook.com', 
+        subject: `🍷 מרתף היין: עודכנו פרטים ל-${updatedWine.name}`,
+        html: `
+          <div dir="rtl" style="font-family: Arial, sans-serif; color: #332F2C; background-color: #F4F2EE; padding: 25px; border-radius: 12px; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #572C3A; margin-top: 0;">היי עילי!</h2>
+            <p style="font-size: 16px;">בוצע כעת עדכון ליין <strong>${updatedWine.name}</strong> במרתף.</p>
+            
+            <div style="background-color: #FFFFFF; padding: 20px; border-radius: 12px; border: 1px solid #EAE6DF; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #B49A65; border-bottom: 2px solid #F4F2EE; padding-bottom: 10px;">מה בדיוק השתנה?</h3>
+              <ul style="line-height: 1.6; padding-right: 20px;">
+                ${changesHtml}
+              </ul>
             </div>
-          `
-        };
 
-        await transporter.sendMail(mailOptions);
-        console.log("✉️ התראת מייל נשלחה בהצלחה");
-      } else {
-        console.log("⚠️ חסרים פרטי מייל בסביבה, ההתראה לא נשלחה.");
-      }
-    } catch (emailError) {
-      console.error('❌ שגיאה בשליחת המייל:', emailError.message);
+            <p style="font-size: 14px; color: #7D736A;">⏰ עדכון זה בוצע בתאריך ${updateTime}</p>
+            <br/>
+            <p style="font-weight: bold; color: #572C3A;">לחיים! 🥂</p>
+          </div>
+        `
+      };
+
+      transporter.sendMail(mailOptions)
+        .then(() => console.log("✉️ התראת מייל נשלחה בהצלחה ברקע"))
+        .catch(emailError => console.error('❌ שגיאה בשליחת המייל ברקע:', emailError.message));
     }
 
-    res.json(updatedWine);
   } catch (err) {
     console.error("❌ Error updating wine:", err);
-    res.status(500).json({ error: 'Error updating wine' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Error updating wine' });
+    }
   }
 });
 
