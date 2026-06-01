@@ -77,7 +77,6 @@ const wineSchema = new mongoose.Schema({
 
 const Wine = mongoose.model('Wine', wineSchema);
 
-// חזרה להגדרות הבטוחות והרגילות של ג'ימייל
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -144,8 +143,11 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     
     let wineData;
     try {
-        const cleanJsonString = responseText.replace(/```json/g, '').replace(/
-```/g, '').trim();
+        let cleanJsonString = responseText.replace(new RegExp('```json', 'g'), '');
+        cleanJsonString = cleanJsonString.replace(new RegExp('
+```', 'g'), '');
+        cleanJsonString = cleanJsonString.trim();
+        
         wineData = JSON.parse(cleanJsonString);
     } catch (parseError) {
         console.error("❌ ה-AI לא החזיר JSON תקין:", responseText);
@@ -252,10 +254,8 @@ app.put('/api/wines/:id', async (req, res) => {
 
     const updateTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
 
-    // 1. קודם כל ולפני הכל - מחזירים תשובה מיידית לטלפון שלך כדי לא לתקוע את האפליקציה!
     res.json(updatedWine);
 
-    // 2. תהליך הרקע הא-סינכרוני לשליחת המייל (לא מעכב את האפליקציה)
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       const mailOptions = {
         from: process.env.EMAIL_USER, 
