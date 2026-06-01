@@ -398,6 +398,10 @@ function App() {
     return '';
   };
 
+  // בדיקת מכשיר אפל (iOS) כדי לדעת אם צריך להפוך את הטקסט בגרפים
+  const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  const fixHebrewSVG = (str) => isIOS ? str.split('').reverse().join('') : str;
+
   const uniqueCountries = ['הכל', ...new Set(winesList.map(w => w.country).filter(c => c && c.trim() !== ''))].sort();
 
   const calculateStats = () => {
@@ -502,6 +506,7 @@ function App() {
       const key = `${selectedGraphYear}-${monthStr}`;
       return { 
         name: monthName, 
+        displayName: fixHebrewSVG(monthName), // לגרף עצמו
         בקבוקים: monthCounts[key] || 0 
       };
     });
@@ -702,7 +707,6 @@ function App() {
       cursor: not-allowed;
     }
 
-    /* מחלקת עיצוב חדשה לתיבת החיפוש החופשי שמונעת ממנה להימתח */
     .search-input {
       flex: 1;
       min-width: 200px;
@@ -810,12 +814,7 @@ function App() {
       border-color: #D3C3B0;
     }
 
-    /* תיקון באג העברית של אפל/ספארי בגרפים */
     .recharts-tooltip-wrapper { direction: rtl; }
-    .recharts-text {
-      direction: rtl;
-      font-family: 'Assistant', sans-serif;
-    }
     
     .cellar-tabs {
       display: flex;
@@ -916,7 +915,7 @@ function App() {
         flex-direction: column;
       }
       .search-input {
-        flex: none; /* ביטול המתיחה של תיבת החיפוש לגובה */
+        flex: none; 
         width: 100%;
       }
       .filter-select {
@@ -1226,12 +1225,13 @@ function App() {
             {sortedAndFilteredWines.map((wine) => {
               const typeStyle = getWineTypeStyle(wine.wineType);
               
+              // הגדרת נתוני הרדאר והפיכת הטקסט במידה וזה אייפון
               const radarData = [
-                { subject: 'חומציות', originalName: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
-                { subject: 'מתיקות', originalName: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
-                { subject: 'גוף', originalName: 'גוף', A: Number(wine.body) || 1, fullMark: 5 },
-                { subject: 'טאנינים', originalName: 'טאנינים', A: Number(wine.tannins) || 1, fullMark: 5 },
-                { subject: 'אלכוהול', originalName: 'אלכוהול', A: Number(wine.alcohol) || 1, fullMark: 5 },
+                { subject: fixHebrewSVG('חומציות'), originalName: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
+                { subject: fixHebrewSVG('מתיקות'), originalName: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
+                { subject: fixHebrewSVG('גוף'), originalName: 'גוף', A: Number(wine.body) || 1, fullMark: 5 },
+                { subject: fixHebrewSVG('טאנינים'), originalName: 'טאנינים', A: Number(wine.tannins) || 1, fullMark: 5 },
+                { subject: fixHebrewSVG('אלכוהול'), originalName: 'אלכוהול', A: Number(wine.alcohol) || 1, fullMark: 5 },
               ];
               
               return (
@@ -1327,7 +1327,7 @@ function App() {
                           <ResponsiveContainer width="100%" height={220}>
                             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                               <PolarGrid stroke="#EAE6DF" />
-                              <PolarAngleAxis dataKey="subject" tick={{ fill: '#7D736A', fontSize: 13, fontFamily: 'Assistant', fontWeight: 'bold', style: { direction: 'rtl' } }} />
+                              <PolarAngleAxis dataKey="subject" tick={{ fill: '#7D736A', fontSize: 13, fontFamily: 'Assistant', fontWeight: 'bold' }} />
                               <PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false} />
                               <Tooltip 
                                 formatter={(value) => [value, 'דירוג']}
@@ -1532,9 +1532,11 @@ function App() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={stats.graphData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#EAE6DF" vertical={false} />
-                        <XAxis dataKey="name" stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant', style: { direction: 'rtl' } }} axisLine={false} tickLine={false} />
+                        <XAxis dataKey="displayName" stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} axisLine={false} tickLine={false} />
                         <YAxis stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} axisLine={false} tickLine={false} allowDecimals={false} />
                         <Tooltip 
+                          formatter={(value) => [value, 'בקבוקים']}
+                          labelFormatter={(label, payload) => payload?.[0]?.payload?.name || label}
                           contentStyle={{ backgroundColor: '#FDFBF7', border: '1px solid #EAE6DF', borderRadius: '8px', color: '#332F2C', direction: 'rtl', fontFamily: 'Assistant' }}
                           itemStyle={{ color: '#572C3A', fontWeight: 'bold' }}
                         />
