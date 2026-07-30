@@ -10,12 +10,13 @@ function App() {
   const initialFormState = {
     name: '', producer: '', wineType: 'אדום', country: '', region: '', 
     grapes: '', vintage: currentYear, isNatural: false, price: '', isGift: false, rating: 5.0, 
-    location: '', drankWith: '', dateDrank: today, aiInsights: '', drinkWindow: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
+    location: '', drankWith: [], dateDrank: today, aiInsights: '', drinkWindow: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
     bottleStatus: 'drank',
     acidity: 1, sweetness: 1, body: 1, tannins: 1, alcohol: 1 
   };
 
   const [formData, setFormData] = useState(initialFormState);
+  const [personInput, setPersonInput] = useState('');
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -27,9 +28,11 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('הכל');
   const [filterCountry, setFilterCountry] = useState('הכל');
+  const [filterPersons, setFilterPersons] = useState([]); // שונה למערך לטובת סינון מרובה
   const [sortOption, setSortOption] = useState('dateDrank_desc');
   
   const [selectedGraphYear, setSelectedGraphYear] = useState(new Date().getFullYear());
+  const [drinkersTab, setDrinkersTab] = useState('individuals'); // מצב הטאב במסך השתיינים הגדולים
 
   const [expandedCards, setExpandedCards] = useState({});
   const [sharingId, setSharingId] = useState(null);
@@ -160,9 +163,14 @@ function App() {
     const url = editingId ? `${API_BASE_URL}/api/wines/${editingId}` : `${API_BASE_URL}/api/wines`;
     const method = editingId ? 'PUT' : 'POST';
 
+    const payload = { ...formData };
+    if (Array.isArray(payload.drankWith)) {
+      payload.drankWith = payload.drankWith.join(', ');
+    }
+
     try {
       const response = await fetch(url, {
-        method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData)
+        method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       
       if (response.ok) {
@@ -173,6 +181,7 @@ function App() {
         setSortOption(newTab === 'stored' ? 'dateOpened_desc' : 'dateDrank_desc');
         
         setFormData(initialFormState);
+        setPersonInput('');
         setPreviewUrl(null);
         fetchWines(); 
         setCurrentView('cellar'); 
@@ -200,9 +209,11 @@ function App() {
     } catch (error) { alert('שגיאה במחיקה.'); }
   };
 
+  const parseDrankWith = (val) => val ? val.split(',').map(s=>s.trim()).filter(Boolean) : [];
+
   const openBottle = (wine) => {
     setEditingId(wine._id);
-    setFormData({ ...initialFormState, ...wine, bottleStatus: 'drank', dateDrank: today });
+    setFormData({ ...initialFormState, ...wine, bottleStatus: 'drank', dateDrank: today, drankWith: parseDrankWith(wine.drankWith) });
     setPreviewUrl(wine.imageUrl);
     setCurrentView('scan'); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -210,7 +221,7 @@ function App() {
 
   const editWine = (wine) => {
     setEditingId(wine._id);
-    setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus, acidity: Number(wine.acidity) || 1, sweetness: Number(wine.sweetness) || 1, body: Number(wine.body) || 1, tannins: Number(wine.tannins) || 1, alcohol: Number(wine.alcohol) || 1 });
+    setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus, drankWith: parseDrankWith(wine.drankWith), acidity: Number(wine.acidity) || 1, sweetness: Number(wine.sweetness) || 1, body: Number(wine.body) || 1, tannins: Number(wine.tannins) || 1, alcohol: Number(wine.alcohol) || 1 });
     setPreviewUrl(wine.imageUrl);
     setCurrentView('scan'); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -296,8 +307,6 @@ function App() {
       `;
 
       document.body.appendChild(container);
-
-      // המתנה לטעינת תמונות הרשת
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const canvas = await html2canvas(container, {
@@ -307,14 +316,12 @@ function App() {
         logging: false
       });
 
-      // הפיכת הקנבס לקובץ תמונה אמיתי
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
       document.body.removeChild(container);
 
       if (blob) {
         const file = new File([blob], `Share_${wine.name.replace(/\s+/g, '_')}.jpg`, { type: 'image/jpeg' });
 
-        // בדיקה האם המכשיר תומך בשיתוף מובנה (כמו אייפון)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
@@ -326,7 +333,6 @@ function App() {
             console.log('Share canceled or failed', error);
           }
         } else {
-          // אם אין תמיכה (למשל במחשב), פשוט נוריד את הקובץ
           const link = document.createElement('a');
           link.download = file.name;
           link.href = URL.createObjectURL(blob);
@@ -396,7 +402,6 @@ function App() {
     if (name.includes('אורוגוואי') || name.includes('אורוגואי')) return '🇺🇾';
     if (name.includes('אנגליה') || name.includes('בריטניה')) return '🇬🇧';
     if (name.includes('קנדה')) return '🇨🇦';
-    
     if (name.includes('יפן')) return '🇯🇵';
     if (name.includes('סין')) return '🇨🇳';
     if (name.includes('הודו')) return '🇮🇳';
@@ -417,10 +422,10 @@ function App() {
     if (name.includes('קולומביה')) return '🇨🇴';
     if (name.includes('פרו')) return '🇵🇪';
     if (name.includes('תאילנד')) return '🇹🇭';
-
     return '';
   };
 
+  const allPeople = [...new Set(winesList.flatMap(w => w.drankWith ? w.drankWith.split(',').map(s=>s.trim()).filter(Boolean) : []))].sort();
   const uniqueCountries = ['הכל', ...new Set(winesList.map(w => w.country).filter(c => c && c.trim() !== ''))].sort();
 
   const calculateStats = () => {
@@ -456,7 +461,38 @@ function App() {
     const topLocations = Object.keys(locationCounts)
       .map(loc => ({ name: loc, count: locationCounts[loc] }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 3);
+      .slice(0, 5);
+
+    // חישוב שותפים נפרד ליחידים ולהרכבים
+    const individualCounts = {};
+    const groupCounts = {};
+
+    drankWines.forEach(w => {
+      if (w.drankWith && w.drankWith.trim() !== '') {
+        const people = w.drankWith.split(',').map(s => s.trim()).filter(Boolean);
+        
+        // סופר כל אדם כאינדיבידואל
+        people.forEach(p => {
+          individualCounts[p] = (individualCounts[p] || 0) + 1;
+        });
+
+        // אם יש יותר מאדם אחד, סופר כהרכב זוגי/קבוצתי עם מפריד של פסיק
+        if (people.length > 1) {
+          const groupName = [...people].sort().join(', '); // שינוי לפסיק במקום פלוס
+          groupCounts[groupName] = (groupCounts[groupName] || 0) + 1;
+        }
+      }
+    });
+
+    const topIndividuals = Object.keys(individualCounts)
+      .map(name => ({ name, count: individualCounts[name] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const topGroups = Object.keys(groupCounts)
+      .map(name => ({ name, count: groupCounts[name] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
     const countryStats = winesList.reduce((acc, w) => {
       if(w.country && w.country.trim() !== '') {
@@ -531,7 +567,7 @@ function App() {
 
     return { 
         totalWines, totalDrank: drankWines.length, totalStored: storedWines.length, naturalDrankCount, naturalDrankPercentage, topGrape,
-        avgRating, avgPrice, favoriteType, topLocations, topCountriesVolume, topCountry, bestWine, countryAverages, graphData, availableYears 
+        avgRating, avgPrice, favoriteType, topLocations, topIndividuals, topGroups, topCountriesVolume, topCountry, bestWine, countryAverages, graphData, availableYears 
     };
   };
 
@@ -548,13 +584,19 @@ function App() {
         (wine.producer && wine.producer.toLowerCase().includes(term)) ||
         (wine.region && wine.region.toLowerCase().includes(term)) ||
         (wine.grapes && wine.grapes.toLowerCase().includes(term)) ||
-        (wine.location && wine.location.toLowerCase().includes(term)) ||
-        (wine.drankWith && wine.drankWith.toLowerCase().includes(term));
+        (wine.location && wine.location.toLowerCase().includes(term));
         
       const matchesType = filterType === 'הכל' || wine.wineType === filterType;
       const matchesCountry = filterCountry === 'הכל' || wine.country === filterCountry;
       
-      return matchesSearch && matchesType && matchesCountry;
+      // לוגיקת AND מרובה עבור שותפים לטעימה
+      const matchesPerson = filterPersons.length === 0 || filterPersons.every(person => {
+        if (!wine.drankWith) return false;
+        const winePeople = wine.drankWith.split(',').map(s=>s.trim());
+        return winePeople.includes(person);
+      });
+      
+      return matchesSearch && matchesType && matchesCountry && matchesPerson;
     });
 
     result.sort((a, b) => {
@@ -584,361 +626,59 @@ function App() {
   const modernStyles = `
     @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600&family=Frank+Ruhl+Libre:wght@300;400;700&display=swap');
 
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     body {
-      background-color: #F4F2EE;
-      color: #332F2C;
-      font-family: 'Assistant', sans-serif;
-      margin: 0;
-      padding: 0;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
+      background-color: #F4F2EE; color: #332F2C; font-family: 'Assistant', sans-serif; margin: 0; padding: 0;
+      -webkit-font-smoothing: antialiased; overflow-x: hidden;
     }
-
     .serif-title { font-family: 'Frank Ruhl Libre', serif; }
-
-    .nav-pill-container {
-      display: flex;
-      justify-content: center;
-      position: sticky;
-      top: 20px;
-      z-index: 100;
-      margin-bottom: 40px;
-      padding: 0 10px;
-    }
-    
+    .nav-pill-container { display: flex; justify-content: center; position: sticky; top: 20px; z-index: 100; margin-bottom: 40px; padding: 0 10px; }
     .nav-pill {
-      display: flex;
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(10px);
-      border-radius: 50px;
-      padding: 6px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-      max-width: 100%;
-      overflow-x: auto;
-      -ms-overflow-style: none;
-      scrollbar-width: none;
+      display: flex; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 50px; padding: 6px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); max-width: 100%; overflow-x: auto; scrollbar-width: none;
     }
-    
-    .nav-pill::-webkit-scrollbar {
-      display: none;
-    }
-
-    .nav-item {
-      padding: 10px 25px;
-      border-radius: 50px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 1.05rem;
-      transition: all 0.3s ease;
-      color: #7D736A;
-      white-space: nowrap;
-    }
-
-    .nav-item.active {
-      background-color: #572C3A;
-      color: #FFFFFF;
-      box-shadow: 0 4px 15px rgba(87, 44, 58, 0.2);
-    }
-
-    .status-toggle {
-      display: flex;
-      background-color: #F8F7F5;
-      border-radius: 50px;
-      padding: 6px;
-      margin-bottom: 25px;
-      border: 1px solid #EAE6DF;
-    }
-    
-    .status-option {
-      flex: 1;
-      text-align: center;
-      padding: 12px;
-      border-radius: 50px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.3s ease;
-      color: #7D736A;
-    }
-    
-    .status-option.active {
-      background-color: #FFFFFF;
-      color: #572C3A;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-      border: 1px solid #EFECE6;
-    }
-
-    .soft-card {
-      background-color: #FFFFFF;
-      border-radius: 28px;
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.03);
-      border: none;
-      transition: all 0.4s ease;
-      overflow: hidden;
-      width: 100%;
-      min-width: 0;
-    }
-
-    .scan-card {
-      padding: 40px;
-    }
-
-    .stat-card {
-      background-color: #FDFBF7;
-      border-radius: 24px;
-      padding: 25px 15px;
-      text-align: center;
-      border: 1px solid #EFECE6;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      transition: all 0.3s ease;
-    }
-
-    .soft-input {
-      padding: 16px 20px;
-      border: none;
-      border-radius: 20px;
-      background-color: #F8F7F5;
-      width: 100%;
-      box-sizing: border-box;
-      font-family: 'Assistant', sans-serif;
-      font-size: 1rem;
-      color: #332F2C;
-      transition: all 0.3s ease;
-      box-shadow: inset 0 2px 5px rgba(0,0,0,0.02);
-    }
-    
-    .soft-input:focus {
-      outline: none;
-      background-color: #FFFFFF;
-      box-shadow: 0 0 0 2px #D3C3B0, inset 0 2px 5px rgba(0,0,0,0.01);
-    }
-    
-    .soft-input:disabled {
-      background-color: #EAE6DF;
-      color: #9C898E;
-      cursor: not-allowed;
-    }
-
-    .search-input {
-      flex: 1;
-      min-width: 200px;
-      border: 1px solid #EAE6DF;
-      background-color: #F8F7F5;
-      color: #332F2C;
-      outline: none;
-      font-size: 1rem;
-      font-family: 'Assistant', sans-serif;
-      padding: 12px;
-      border-radius: 12px;
-      transition: all 0.3s ease;
-    }
-
-    .search-input:focus {
-      background-color: #FFFFFF;
-      border-color: #D3C3B0;
-    }
-
-    .filter-panel {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 15px;
-      margin-bottom: 40px;
-      background-color: #FFFFFF;
-      padding: 20px;
-      border-radius: 24px;
-      box-shadow: 0 5px 25px rgba(0,0,0,0.03);
-      border: 1px solid #EFECE6;
-    }
-    
-    .filter-select {
-      flex: 1;
-      min-width: 120px;
-      border: 1px solid #EAE6DF;
-      background-color: #F8F7F5;
-      border-radius: 12px;
-      padding: 12px;
-      outline: none;
-      font-size: 1rem;
-      font-family: 'Assistant', sans-serif;
-      color: #5A5A5A;
-      cursor: pointer;
-    }
-
-    .btn-pill-primary {
-      background-color: #572C3A;
-      color: #FDFBF7;
-      padding: 18px;
-      border: none;
-      border-radius: 50px;
-      font-size: 1.15rem;
-      font-family: 'Assistant', sans-serif;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-    .btn-pill-primary:hover:not(:disabled) {
-      background-color: #3A1C24;
-      transform: translateY(-2px);
-      box-shadow: 0 10px 25px rgba(87, 44, 58, 0.25);
-    }
-
-    .btn-pill-outline {
-      background-color: transparent;
-      color: #572C3A;
-      padding: 10px 20px;
-      border: 2px solid #EAE6DF;
-      border-radius: 50px;
-      font-family: 'Assistant', sans-serif;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-    .btn-pill-outline:hover:not(:disabled) {
-      border-color: #572C3A;
-      background-color: #FDFBF7;
-    }
-    .btn-pill-outline:disabled {
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-    
-    .toggle-btn {
-      width: 100%;
-      padding: 10px;
-      background-color: transparent;
-      border: 1px solid #EAE6DF;
-      border-radius: 12px;
-      color: #7D736A;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: 'Assistant', sans-serif;
-      font-size: 0.95rem;
-      transition: all 0.3s ease;
-      text-align: center;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-    }
-    .toggle-btn:hover {
-      background-color: #F8F7F5;
-      color: #572C3A;
-      border-color: #D3C3B0;
-    }
-
+    .nav-pill::-webkit-scrollbar { display: none; }
+    .nav-item { padding: 10px 25px; border-radius: 50px; cursor: pointer; font-weight: 600; font-size: 1.05rem; transition: all 0.3s ease; color: #7D736A; white-space: nowrap; }
+    .nav-item.active { background-color: #572C3A; color: #FFFFFF; box-shadow: 0 4px 15px rgba(87, 44, 58, 0.2); }
+    .status-toggle { display: flex; background-color: #F8F7F5; border-radius: 50px; padding: 6px; margin-bottom: 25px; border: 1px solid #EAE6DF; }
+    .status-option { flex: 1; text-align: center; padding: 12px; border-radius: 50px; cursor: pointer; font-weight: 600; transition: all 0.3s ease; color: #7D736A; }
+    .status-option.active { background-color: #FFFFFF; color: #572C3A; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #EFECE6; }
+    .soft-card { background-color: #FFFFFF; border-radius: 28px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.03); border: none; transition: all 0.4s ease; overflow: hidden; width: 100%; min-width: 0; }
+    .scan-card { padding: 40px; }
+    .stat-card { background-color: #FDFBF7; border-radius: 24px; padding: 25px 15px; text-align: center; border: 1px solid #EFECE6; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: all 0.3s ease; }
+    .soft-input { padding: 16px 20px; border: none; border-radius: 20px; background-color: #F8F7F5; width: 100%; box-sizing: border-box; font-family: 'Assistant', sans-serif; font-size: 1rem; color: #332F2C; transition: all 0.3s ease; box-shadow: inset 0 2px 5px rgba(0,0,0,0.02); }
+    .soft-input:focus { outline: none; background-color: #FFFFFF; box-shadow: 0 0 0 2px #D3C3B0, inset 0 2px 5px rgba(0,0,0,0.01); }
+    .soft-input:disabled { background-color: #EAE6DF; color: #9C898E; cursor: not-allowed; }
+    .search-input { flex: 1; min-width: 200px; border: 1px solid #EAE6DF; background-color: #F8F7F5; color: #332F2C; outline: none; font-size: 1rem; font-family: 'Assistant', sans-serif; padding: 12px; border-radius: 12px; transition: all 0.3s ease; }
+    .search-input:focus { background-color: #FFFFFF; border-color: #D3C3B0; }
+    .filter-panel { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 40px; background-color: #FFFFFF; padding: 20px; border-radius: 24px; box-shadow: 0 5px 25px rgba(0,0,0,0.03); border: 1px solid #EFECE6; align-items: flex-start; }
+    .filter-select { flex: 1; min-width: 120px; border: 1px solid #EAE6DF; background-color: #F8F7F5; border-radius: 12px; padding: 12px; outline: none; font-size: 1rem; font-family: 'Assistant', sans-serif; color: #5A5A5A; cursor: pointer; }
+    .btn-pill-primary { background-color: #572C3A; color: #FDFBF7; padding: 18px; border: none; border-radius: 50px; font-size: 1.15rem; font-family: 'Assistant', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+    .btn-pill-primary:hover:not(:disabled) { background-color: #3A1C24; transform: translateY(-2px); box-shadow: 0 10px 25px rgba(87, 44, 58, 0.25); }
+    .btn-pill-outline { background-color: transparent; color: #572C3A; padding: 10px 20px; border: 2px solid #EAE6DF; border-radius: 50px; font-family: 'Assistant', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+    .btn-pill-outline:hover:not(:disabled) { border-color: #572C3A; background-color: #FDFBF7; }
+    .btn-pill-outline:disabled { cursor: not-allowed; opacity: 0.6; }
+    .toggle-btn { width: 100%; padding: 10px; background-color: transparent; border: 1px solid #EAE6DF; border-radius: 12px; color: #7D736A; font-weight: 600; cursor: pointer; font-family: 'Assistant', sans-serif; font-size: 0.95rem; transition: all 0.3s ease; text-align: center; display: flex; justify-content: center; align-items: center; gap: 8px; }
+    .toggle-btn:hover { background-color: #F8F7F5; color: #572C3A; border-color: #D3C3B0; }
     .recharts-tooltip-wrapper { direction: rtl; }
-    
-    .cellar-tabs {
-      display: flex;
-      justify-content: center;
-      gap: 30px;
-      margin-bottom: 30px;
-      border-bottom: 2px solid #EFECE6;
-    }
-    
-    .cellar-tab {
-      padding: 10px 20px;
-      font-size: 1.2rem;
-      font-family: 'Frank Ruhl Libre', serif;
-      color: #BCAFA4;
-      cursor: pointer;
-      position: relative;
-      transition: color 0.3s;
-    }
-    
-    .cellar-tab.active {
-      color: #572C3A;
-      font-weight: bold;
-    }
-    
-    .cellar-tab.active::after {
-      content: '';
-      position: absolute;
-      bottom: -2px;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background-color: #572C3A;
-    }
-
-    .rtl-textarea {
-      direction: rtl;
-      text-align: right;
-      unicode-bidi: plaintext;
-    }
-    
-    .profile-slider {
-      width: 100%;
-      height: 10px;
-      border-radius: 5px;
-      background: #EAE6DF;
-      outline: none;
-      opacity: 0.8;
-      transition: opacity .2s;
-      accent-color: #572C3A;
-    }
-    
-    .profile-slider:hover {
-      opacity: 1;
-    }
-    
-    .profile-label-container {
-      display: flex;
-      justify-content: space-between;
-      color: #9C898E;
-      font-size: 0.8rem;
-      margin-top: 4px;
-    }
-
-    .responsive-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    .responsive-grid-complex {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      background-color: #F8F7F5;
-      padding: 20px;
-      border-radius: 24px;
-      margin-top: 10px;
-    }
+    .cellar-tabs { display: flex; justify-content: center; gap: 30px; margin-bottom: 30px; border-bottom: 2px solid #EFECE6; }
+    .cellar-tab { padding: 10px 20px; font-size: 1.2rem; font-family: 'Frank Ruhl Libre', serif; color: #BCAFA4; cursor: pointer; position: relative; transition: color 0.3s; }
+    .cellar-tab.active { color: #572C3A; font-weight: bold; }
+    .cellar-tab.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 2px; background-color: #572C3A; }
+    .rtl-textarea { direction: rtl; text-align: right; unicode-bidi: plaintext; }
+    .profile-slider { width: 100%; height: 10px; border-radius: 5px; background: #EAE6DF; outline: none; opacity: 0.8; transition: opacity .2s; accent-color: #572C3A; }
+    .profile-slider:hover { opacity: 1; }
+    .profile-label-container { display: flex; justify-content: space-between; color: #9C898E; font-size: 0.8rem; margin-top: 4px; }
+    .responsive-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .responsive-grid-complex { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background-color: #F8F7F5; padding: 20px; border-radius: 24px; margin-top: 10px; }
 
     @media (max-width: 600px) {
-      .nav-item {
-        padding: 8px 15px;
-        font-size: 0.95rem;
-      }
-      .responsive-grid {
-        grid-template-columns: 1fr;
-        gap: 15px;
-      }
-      .responsive-grid-complex {
-        grid-template-columns: 1fr;
-        padding: 15px;
-      }
-      .scan-card {
-        padding: 20px;
-      }
-      .filter-panel {
-        flex-direction: column;
-      }
-      .search-input {
-        flex: none; 
-        width: 100%;
-      }
-      .filter-select {
-        flex: none;
-        width: 100%;
-      }
+      .nav-item { padding: 8px 15px; font-size: 0.95rem; }
+      .responsive-grid { grid-template-columns: 1fr; gap: 15px; }
+      .responsive-grid-complex { grid-template-columns: 1fr; padding: 15px; }
+      .scan-card { padding: 20px; }
+      .filter-panel { flex-direction: column; }
+      .search-input, .filter-select { flex: none; width: 100%; }
     }
   `;
 
@@ -967,10 +707,8 @@ function App() {
 
       {currentView === 'scan' && (
         <div style={{ animation: 'fadeIn 0.5s ease' }}>
-          
           <div className="soft-card scan-card">
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-              
               <div style={{ textAlign: 'center', marginBottom: '10px' }}>
                 {previewUrl && <img src={previewUrl} style={{ width: '100%', maxHeight: '350px', objectFit: 'contain', marginBottom: '20px', borderRadius: '20px', backgroundColor: '#F8F7F5', padding: '10px' }} />}
                 
@@ -986,25 +724,14 @@ function App() {
                     </label>
                   </div>
                 )}
-
                 {isAnalyzing && <p style={{ color: '#B49A65', fontSize: '1.1rem', marginTop: '20px', fontWeight: '600', animation: 'pulse 1.5s infinite' }}>מפענח את התווית...</p>}
               </div>
 
               <div>
                 <label style={labelStyle}>סטטוס הבקבוק</label>
                 <div className="status-toggle">
-                  <div 
-                    className={`status-option ${formData.bottleStatus === 'drank' ? 'active' : ''}`}
-                    onClick={() => handleStatusChange('drank')}
-                  >
-                    פתיחת בקבוק
-                  </div>
-                  <div 
-                    className={`status-option ${formData.bottleStatus === 'stored' ? 'active' : ''}`}
-                    onClick={() => handleStatusChange('stored')}
-                  >
-                    שמור באוסף
-                  </div>
+                  <div className={`status-option ${formData.bottleStatus === 'drank' ? 'active' : ''}`} onClick={() => handleStatusChange('drank')}>פתיחת בקבוק</div>
+                  <div className={`status-option ${formData.bottleStatus === 'stored' ? 'active' : ''}`} onClick={() => handleStatusChange('stored')}>שמור באוסף</div>
                 </div>
               </div>
 
@@ -1054,16 +781,7 @@ function App() {
               <div className="responsive-grid-complex">
                 <div>
                   <label style={labelStyle}>מחיר (₪)</label>
-                  <input 
-                    className="soft-input" 
-                    type="number" 
-                    name="price" 
-                    value={formData.price} 
-                    onChange={handleChange} 
-                    disabled={formData.isGift} 
-                    placeholder={formData.isGift ? "מתנה" : ""}
-                    style={{ backgroundColor: formData.isGift ? '#EAE6DF' : '#fff' }}
-                  />
+                  <input className="soft-input" type="number" name="price" value={formData.price} onChange={handleChange} disabled={formData.isGift} placeholder={formData.isGift ? "מתנה" : ""} style={{ backgroundColor: formData.isGift ? '#EAE6DF' : '#fff' }} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '28px' }}>
                   <input type="checkbox" name="isGift" checked={formData.isGift} onChange={handleChange} style={{ width: '22px', height: '22px', accentColor: '#572C3A' }} />
@@ -1079,7 +797,6 @@ function App() {
               <div style={{ marginTop: '20px', padding: '30px', backgroundColor: '#FDFBF7', borderRadius: '24px', border: '1px solid #EFECE6' }}>
                 <h3 className="serif-title" style={{ color: '#572C3A', margin: '0 0 25px 0', fontSize: '1.5rem', textAlign: 'center' }}>פרופיל טעם (כיול ידני)</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  
                   {[
                     { key: 'acidity', label: 'חומציות', low: 'נמוכה', high: 'גבוהה' },
                     { key: 'sweetness', label: 'מתיקות', low: 'יבש', high: 'מתוק' },
@@ -1089,20 +806,8 @@ function App() {
                   ].map(item => (
                     <div key={item.key}>
                       <label style={{ ...labelStyle, marginBottom: '5px' }}>{item.label}: <span style={{ color: '#572C3A', fontWeight: 'bold', fontSize: '1.1rem' }}>{formData[item.key]}</span></label>
-                      <input 
-                        type="range" 
-                        name={item.key}
-                        min="1" 
-                        max="5" 
-                        step="1" 
-                        value={formData[item.key]} 
-                        onChange={handleChange} 
-                        className="profile-slider" 
-                      />
-                      <div className="profile-label-container">
-                        <span>{item.low}</span>
-                        <span>{item.high}</span>
-                      </div>
+                      <input type="range" name={item.key} min="1" max="5" step="1" value={formData[item.key]} onChange={handleChange} className="profile-slider" />
+                      <div className="profile-label-container"><span>{item.low}</span><span>{item.high}</span></div>
                     </div>
                   ))}
                 </div>
@@ -1111,44 +816,83 @@ function App() {
               {formData.bottleStatus === 'drank' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', animation: 'fadeIn 0.4s ease' }}>
                   <div style={{ height: '1px', backgroundColor: '#EFECE6', margin: '10px 0' }}></div>
-                  
                   <div style={{ padding: '15px', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #EAE6DF' }}>
                     <label style={{ ...labelStyle, marginBottom: '5px' }}>ציון אישי: <span style={{ color: '#572C3A', fontWeight: 'bold', fontSize: '1.2rem' }}>{formData.rating} ★</span></label>
-                    <input 
-                        type="range" 
-                        name="rating" 
-                        min="0" 
-                        max="5" 
-                        step="0.1" 
-                        value={formData.rating} 
-                        onChange={handleChange} 
-                        className="profile-slider" 
-                    />
-                    <div className="profile-label-container">
-                        <span>0</span>
-                        <span>5</span>
-                    </div>
+                    <input type="range" name="rating" min="0" max="5" step="0.1" value={formData.rating} onChange={handleChange} className="profile-slider" />
+                    <div className="profile-label-container"><span>0</span><span>5</span></div>
                   </div>
 
                   <div className="responsive-grid">
-                    <div>
-                      <label style={labelStyle}>תאריך טעימה</label>
-                      <input className="soft-input" type="date" name="dateDrank" value={formData.dateDrank || ''} onChange={handleChange} />
-                    </div>
+                    <div><label style={labelStyle}>תאריך טעימה</label><input className="soft-input" type="date" name="dateDrank" value={formData.dateDrank || ''} onChange={handleChange} /></div>
                     <div><label style={labelStyle}>מיקום הטעימה</label><input className="soft-input" name="location" value={formData.location} onChange={handleChange} /></div>
                   </div>
-
-                  <div><label style={labelStyle}>שותפים לטעימה</label><input className="soft-input" name="drankWith" value={formData.drankWith} onChange={handleChange} /></div>
-
+                  
+                  {/* אזור השותפים - תגיות, הוספה מהירה, והשלמה */}
                   <div>
-                    <label style={labelStyle}>רשמי טעימה</label>
-                    <textarea className="soft-input rtl-textarea" name="tastingNotes" value={formData.tastingNotes} onChange={handleChange} style={{ minHeight: '100px' }} />
+                    <label style={labelStyle}>שותפים לטעימה</label>
+                    
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.85rem', color: '#9C898E', alignSelf: 'center', fontWeight: '600' }}>הוספה מהירה:</span>
+                      {['עילי', 'גילי'].map(name => (
+                        <button type="button" key={name} onClick={() => {
+                          if(!formData.drankWith.includes(name)) setFormData(prev => ({...prev, drankWith: [...prev.drankWith, name]}));
+                        }} style={{ background: '#F8F7F5', border: '1px solid #EAE6DF', borderRadius: '50px', padding: '4px 12px', fontSize: '0.9rem', color: '#572C3A', cursor: 'pointer', fontWeight: '600' }}>
+                          + {name}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                      {Array.isArray(formData.drankWith) && formData.drankWith.map((person, idx) => (
+                        <span key={idx} style={{ backgroundColor: '#EAE6DF', color: '#572C3A', padding: '6px 12px', borderRadius: '50px', fontSize: '0.95rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {person}
+                          <span onClick={() => {
+                            setFormData(prev => ({ ...prev, drankWith: prev.drankWith.filter((_, i) => i !== idx) }))
+                          }} style={{ cursor: 'pointer', color: '#A34E4E', fontWeight: 'bold' }}>×</span>
+                        </span>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <input 
+                        className="soft-input" 
+                        list="people-list"
+                        value={personInput}
+                        onChange={(e) => setPersonInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if(e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = personInput.trim();
+                            if(val && !formData.drankWith.includes(val)) {
+                              setFormData(prev => ({ ...prev, drankWith: [...prev.drankWith, val] }));
+                              setPersonInput('');
+                            }
+                          }
+                        }}
+                        placeholder="הקלד שם אחר ולחץ Enter..." 
+                      />
+                      <button 
+                        type="button" 
+                        className="btn-pill-primary" 
+                        style={{ padding: '10px 20px', borderRadius: '20px', margin: 0, whiteSpace: 'nowrap' }}
+                        onClick={() => {
+                          const val = personInput.trim();
+                          if(val && !formData.drankWith.includes(val)) {
+                            setFormData(prev => ({ ...prev, drankWith: [...prev.drankWith, val] }));
+                            setPersonInput('');
+                          }
+                        }}
+                      >
+                        הוסף
+                      </button>
+                    </div>
+                    <datalist id="people-list">
+                      {allPeople.map(p => <option key={p} value={p} />)}
+                    </datalist>
                   </div>
 
-                  <div>
-                    <label style={labelStyle}>זיכרון מהחוויה</label>
-                    <textarea className="soft-input rtl-textarea" name="memory" value={formData.memory} onChange={handleChange} style={{ minHeight: '100px' }} />
-                  </div>
+                  <div><label style={labelStyle}>רשמי טעימה</label><textarea className="soft-input rtl-textarea" name="tastingNotes" value={formData.tastingNotes} onChange={handleChange} style={{ minHeight: '100px' }} /></div>
+                  <div><label style={labelStyle}>זיכרון מהחוויה</label><textarea className="soft-input rtl-textarea" name="memory" value={formData.memory} onChange={handleChange} style={{ minHeight: '100px' }} /></div>
                 </div>
               )}
 
@@ -1157,9 +901,7 @@ function App() {
                   {isSaving ? 'שומר...' : (editingId ? 'שמירת שינויים' : 'הוספה למערכת')}
                 </button>
                 {editingId && (
-                  <button className="btn-pill-outline" type="button" onClick={() => {setEditingId(null); setFormData(initialFormState); setPreviewUrl(null); setCurrentView('cellar');}} style={{ flex: 1 }}>
-                    ביטול
-                  </button>
+                  <button className="btn-pill-outline" type="button" onClick={() => {setEditingId(null); setFormData(initialFormState); setPersonInput(''); setPreviewUrl(null); setCurrentView('cellar');}} style={{ flex: 1 }}>ביטול</button>
                 )}
               </div>
             </form>
@@ -1169,79 +911,58 @@ function App() {
 
       {currentView === 'cellar' && (
         <div style={{ animation: 'fadeIn 0.5s ease' }}>
-          
           <div className="cellar-tabs">
-            <div 
-              className={`cellar-tab ${cellarTab === 'drank' ? 'active' : ''}`}
-              onClick={() => {
-                setCellarTab('drank');
-                setSortOption('dateDrank_desc'); 
-              }}
-            >
-              היסטוריית טעימות ({stats ? stats.totalDrank : 0})
-            </div>
-            <div 
-              className={`cellar-tab ${cellarTab === 'stored' ? 'active' : ''}`}
-              onClick={() => {
-                setCellarTab('stored');
-                setSortOption('dateOpened_desc'); 
-              }}
-            >
-              האוסף הפרטי ({stats ? stats.totalStored : 0})
-            </div>
+            <div className={`cellar-tab ${cellarTab === 'drank' ? 'active' : ''}`} onClick={() => { setCellarTab('drank'); setSortOption('dateDrank_desc'); }}>היסטוריית טעימות ({stats ? stats.totalDrank : 0})</div>
+            <div className={`cellar-tab ${cellarTab === 'stored' ? 'active' : ''}`} onClick={() => { setCellarTab('stored'); setSortOption('dateOpened_desc'); }}>האוסף הפרטי ({stats ? stats.totalStored : 0})</div>
           </div>
 
           <div className="filter-panel">
-            <input 
-              type="text" 
-              placeholder="חיפוש חופשי..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
+            <input type="text" placeholder="חיפוש חופשי..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="search-input" />
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="filter-select">
+              <option value="הכל">כל הסוגים</option><option value="אדום">אדום</option><option value="לבן">לבן</option><option value="כתום">כתום</option><option value="רוזה">רוזה</option><option value="מבעבע">מבעבע</option><option value="סאקה">סאקה</option>
+            </select>
+            <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="filter-select">
+              {uniqueCountries.map(country => (<option key={country} value={country}>{country === 'הכל' ? 'כל המדינות' : country}</option>))}
+            </select>
             
-            <select 
-              value={filterType} 
-              onChange={(e) => setFilterType(e.target.value)}
-              className="filter-select"
-            >
-              <option value="הכל">כל הסוגים</option>
-              <option value="אדום">אדום</option>
-              <option value="לבן">לבן</option>
-              <option value="כתום">כתום</option>
-              <option value="רוזה">רוזה</option>
-              <option value="מבעבע">מבעבע</option>
-              <option value="סאקה">סאקה</option>
-            </select>
+            {/* סינון מרובה שותפים עם צ'יפים */}
+            <div style={{ flex: 1, minWidth: '120px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <select 
+                value="" 
+                onChange={(e) => {
+                  if (e.target.value !== "" && !filterPersons.includes(e.target.value)) {
+                    setFilterPersons([...filterPersons, e.target.value]);
+                  }
+                }} 
+                className="filter-select"
+                style={{ width: '100%' }}
+              >
+                <option value="">שותפים לטעימה...</option>
+                {allPeople.map(person => (<option key={person} value={person}>{person}</option>))}
+              </select>
+              {filterPersons.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {filterPersons.map(p => (
+                    <span key={p} style={{ backgroundColor: '#572C3A', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {p}
+                      <span style={{ cursor: 'pointer', color: '#EAE6DF' }} onClick={() => setFilterPersons(prev => prev.filter(item => item !== p))}>×</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
 
-            <select 
-              value={filterCountry} 
-              onChange={(e) => setFilterCountry(e.target.value)}
-              className="filter-select"
-            >
-              {uniqueCountries.map(country => (
-                <option key={country} value={country}>{country === 'הכל' ? 'כל המדינות' : country}</option>
-              ))}
-            </select>
-
-            <select 
-              value={sortOption} 
-              onChange={(e) => setSortOption(e.target.value)}
-              className="filter-select"
-            >
-              <option value="dateOpened_desc">תאריך הוספה (חדש לישן)</option>
-              <option value="dateOpened_asc">תאריך הוספה (ישן לחדש)</option>
+            <select value={sortOption} onChange={(e) => setSortOption(e.target.value)} className="filter-select">
+              <option value="dateOpened_desc">תאריך הוספה (חדש לישן)</option><option value="dateOpened_asc">תאריך הוספה (ישן לחדש)</option>
               {cellarTab === 'drank' && <option value="dateDrank_desc">תאריך טעימה (מהחדש לישן)</option>}
               {cellarTab === 'drank' && <option value="rating_desc">ציון (מהגבוה לנמוך)</option>}
-              <option value="price_desc">מחיר (מהיקר לזול)</option>
-              <option value="country_asc">לפי מדינה (א-ת)</option>
+              <option value="price_desc">מחיר (מהיקר לזול)</option><option value="country_asc">לפי מדינה (א-ת)</option>
             </select>
           </div>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '35px', alignItems: 'start' }}>
             {sortedAndFilteredWines.map((wine) => {
               const typeStyle = getWineTypeStyle(wine.wineType);
-              
               const radarData = [
                 { subject: 'חומציות', originalName: 'חומציות', A: Number(wine.acidity) || 1, fullMark: 5 },
                 { subject: 'מתיקות', originalName: 'מתיקות', A: Number(wine.sweetness) || 1, fullMark: 5 },
@@ -1252,16 +973,9 @@ function App() {
               
               return (
               <div key={wine._id} className="soft-card" style={{ display: 'flex', flexDirection: 'column' }}>
-                
                 <div style={{ padding: '20px', backgroundColor: '#F8F7F5', display: 'flex', justifyContent: 'center', position: 'relative' }}>
-                  {wine.imageUrl ? (
-                     <img src={wine.imageUrl} style={{ width: '100%', height: '280px', objectFit: 'contain', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.1))' }} />
-                  ) : (
-                     <div style={{ width: '100%', height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#BCAFA4' }}>ללא תמונה</div>
-                  )}
-                  {wine.bottleStatus === 'stored' && (
-                    <div style={{ position: 'absolute', top: '15px', right: '15px', backgroundColor: '#572C3A', color: 'white', padding: '5px 12px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold' }}>שמור באוסף</div>
-                  )}
+                  {wine.imageUrl ? <img src={wine.imageUrl} style={{ width: '100%', height: '280px', objectFit: 'contain', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.1))' }} /> : <div style={{ width: '100%', height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#BCAFA4' }}>ללא תמונה</div>}
+                  {wine.bottleStatus === 'stored' && <div style={{ position: 'absolute', top: '15px', right: '15px', backgroundColor: '#572C3A', color: 'white', padding: '5px 12px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold' }}>שמור באוסף</div>}
                 </div>
                 
                 <div style={{ padding: '30px', display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -1269,88 +983,54 @@ function App() {
                     <h3 className="serif-title" style={{ margin: '0', color: '#2B2624', fontSize: '1.6rem', lineHeight: '1.2' }}>{wine.name}</h3>
                     {wine.rating && wine.bottleStatus === 'drank' && <span style={{ color: '#B49A65', fontSize: '1.2rem', fontWeight: 'bold' }}>{wine.rating} ★</span>}
                   </div>
-                  
-                  <p style={{ color: '#7D736A', fontSize: '1rem', margin: '0 0 5px 0', letterSpacing: '0.5px' }}>
-                    {getCountryFlag(wine.country)} {wine.country}{wine.region ? ` (${wine.region})` : ''} • {wine.producer} {wine.vintage ? `• ${wine.vintage}` : ''} 
-                  </p>
-                  
-                  {wine.grapes && (
-                    <p style={{ color: '#9C898E', fontSize: '0.95rem', margin: '0 0 20px 0' }}>
-                      זני ענבים: <span style={{fontWeight: '600', color: '#7D736A'}}>{wine.grapes}</span>
-                    </p>
-                  )}
+                  <p style={{ color: '#7D736A', fontSize: '1rem', margin: '0 0 5px 0', letterSpacing: '0.5px' }}>{getCountryFlag(wine.country)} {wine.country}{wine.region ? ` (${wine.region})` : ''} • {wine.producer} {wine.vintage ? `• ${wine.vintage}` : ''}</p>
+                  {wine.grapes && <p style={{ color: '#9C898E', fontSize: '0.95rem', margin: '0 0 20px 0' }}>זני ענבים: <span style={{fontWeight: '600', color: '#7D736A'}}>{wine.grapes}</span></p>}
                   
                   {wine.bottleStatus === 'stored' && wine.drinkWindow && (
                     <div style={{ padding: '12px 15px', backgroundColor: '#FDFBF7', borderRadius: '12px', border: '1px solid #EAE6DF', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontSize: '1.2rem' }}>⏳</span>
-                      <div>
-                        <span style={{ display: 'block', color: '#9C898E', fontSize: '0.85rem' }}>חלון שתייה</span>
-                        <span style={{ color: '#572C3A', fontWeight: 'bold', fontSize: '1rem' }}>{wine.drinkWindow}</span>
-                      </div>
+                      <div><span style={{ display: 'block', color: '#9C898E', fontSize: '0.85rem' }}>חלון שתייה</span><span style={{ color: '#572C3A', fontWeight: 'bold', fontSize: '1rem' }}>{wine.drinkWindow}</span></div>
                     </div>
                   )}
                   
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '25px', alignItems: 'center' }}>
                     <span style={{ ...typeStyle, padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>{wine.wineType}</span>
                     {wine.isNatural && <span style={{ color: '#4A5D23', backgroundColor: '#F3F6EB', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>טבעי</span>}
-                    {wine.isGift ? (
-                      <span style={{ color: '#572C3A', backgroundColor: '#EAE6DF', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>מתנה</span>
-                    ) : wine.price ? (
-                      <span style={{ color: '#572C3A', backgroundColor: '#EAE6DF', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>₪{wine.price}</span>
-                    ) : null}
+                    {wine.isGift ? <span style={{ color: '#572C3A', backgroundColor: '#EAE6DF', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>מתנה</span> : wine.price ? <span style={{ color: '#572C3A', backgroundColor: '#EAE6DF', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>₪{wine.price}</span> : null}
                   </div>
 
                   {wine.bottleStatus === 'drank' && (
                     <div style={{ padding: '20px', backgroundColor: '#F8F7F5', borderRadius: '20px', marginBottom: '25px' }}>
                       {wine.dateDrank && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}><span style={{ color: '#9C898E', fontSize: '0.95rem' }}>תאריך:</span> <span style={{ fontWeight: '600' }}>{formatPerfectDate(wine.dateDrank)}</span></div>}
                       {wine.location && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}><span style={{ color: '#9C898E', fontSize: '0.95rem' }}>מקום:</span> <span style={{ fontWeight: '600' }}>{wine.location}</span></div>}
-                      {wine.drankWith && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#9C898E', fontSize: '0.95rem' }}>שותפים:</span> <span style={{ fontWeight: '600' }}>{wine.drankWith}</span></div>}
+                      {wine.drankWith && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: '#9C898E', fontSize: '0.95rem' }}>שותפים:</span> 
+                          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {wine.drankWith.split(',').map(s=>s.trim()).filter(Boolean).map((p, idx) => (
+                              <span key={idx} style={{ backgroundColor: '#EAE6DF', color: '#572C3A', padding: '2px 8px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: '600' }}>{p}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {wine.bottleStatus === 'drank' && wine.tastingNotes && (
-                    <div style={{ marginBottom: '20px' }}>
-                      <span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>רשמים</span>
-                      <p className="rtl-textarea" style={{ margin: 0, fontSize: '1rem', lineHeight: '1.5' }}>{wine.tastingNotes}</p>
-                    </div>
-                  )}
-
-                  {wine.bottleStatus === 'drank' && wine.memory && (
-                    <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#FDFBF7', borderRadius: '16px', border: '1px solid #EAE6DF' }}>
-                      <span style={{ color: '#B49A65', fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>זיכרון</span>
-                      <p className="rtl-textarea" style={{ margin: 0, fontSize: '1rem', lineHeight: '1.5', fontStyle: 'italic' }}>"{wine.memory}"</p>
-                    </div>
-                  )}
+                  {wine.bottleStatus === 'drank' && wine.tastingNotes && (<div style={{ marginBottom: '20px' }}><span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>רשמים</span><p className="rtl-textarea" style={{ margin: 0, fontSize: '1rem', lineHeight: '1.5' }}>{wine.tastingNotes}</p></div>)}
+                  {wine.bottleStatus === 'drank' && wine.memory && (<div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#FDFBF7', borderRadius: '16px', border: '1px solid #EAE6DF' }}><span style={{ color: '#B49A65', fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>זיכרון</span><p className="rtl-textarea" style={{ margin: 0, fontSize: '1rem', lineHeight: '1.5', fontStyle: 'italic' }}>"{wine.memory}"</p></div>)}
 
                   <div style={{ marginTop: '5px', marginBottom: '25px' }}>
-                    <button 
-                      onClick={() => toggleCard(wine._id)} 
-                      className="toggle-btn"
-                    >
-                      {expandedCards[wine._id] ? 'הסתר מידע נוסף' : 'הצג סומלייה ופרופיל טעמים'}
-                    </button>
-
+                    <button onClick={() => toggleCard(wine._id)} className="toggle-btn">{expandedCards[wine._id] ? 'הסתר מידע נוסף' : 'הצג סומלייה ופרופיל טעמים'}</button>
                     {expandedCards[wine._id] && (
                       <div style={{ animation: 'fadeIn 0.3s ease', marginTop: '20px' }}>
-                        {wine.aiInsights && (
-                          <div style={{ marginBottom: '25px' }}>
-                            <span className="serif-title" style={{ color: '#B49A65', fontSize: '1rem', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>הסומלייה הדיגיטלי</span>
-                            <p className="rtl-textarea" style={{ margin: 0, fontSize: '1rem', lineHeight: '1.6', color: '#5A5A5A', whiteSpace: 'pre-wrap' }}>{wine.aiInsights}</p>
-                          </div>
-                        )}
-
+                        {wine.aiInsights && (<div style={{ marginBottom: '25px' }}><span className="serif-title" style={{ color: '#B49A65', fontSize: '1rem', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>הסומלייה הדיגיטלי</span><p className="rtl-textarea" style={{ margin: 0, fontSize: '1rem', lineHeight: '1.6', color: '#5A5A5A', whiteSpace: 'pre-wrap' }}>{wine.aiInsights}</p></div>)}
                         <div style={{ padding: '10px', backgroundColor: '#FFFFFF', borderRadius: '20px', display: 'flex', justifyContent: 'center' }}>
                           <ResponsiveContainer width="100%" height={220}>
                             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                               <PolarGrid stroke="#EAE6DF" />
                               <PolarAngleAxis dataKey="subject" tick={{ fill: '#7D736A', fontSize: 13, fontFamily: 'Assistant', fontWeight: 'bold' }} />
                               <PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false} />
-                              <Tooltip 
-                                formatter={(value) => [value, 'דירוג']}
-                                labelFormatter={(label, payload) => payload?.[0]?.payload?.originalName || label}
-                                contentStyle={{ backgroundColor: '#FDFBF7', border: '1px solid #EAE6DF', borderRadius: '8px', color: '#332F2C', direction: 'rtl', fontFamily: 'Assistant' }}
-                                itemStyle={{ color: '#572C3A', fontWeight: 'bold' }}
-                              />
+                              <Tooltip formatter={(value) => [value, 'דירוג']} labelFormatter={(label, payload) => payload?.[0]?.payload?.originalName || label} contentStyle={{ backgroundColor: '#FDFBF7', border: '1px solid #EAE6DF', borderRadius: '8px', color: '#332F2C', direction: 'rtl', fontFamily: 'Assistant' }} itemStyle={{ color: '#572C3A', fontWeight: 'bold' }} />
                               <Radar name="פרופיל טעם" dataKey="A" stroke="#572C3A" fill="#572C3A" fillOpacity={0.2} dot={{ r: 4, fill: '#572C3A', stroke: '#FFFFFF', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#B49A65', stroke: '#FFFFFF' }} />
                             </RadarChart>
                           </ResponsiveContainer>
@@ -1360,22 +1040,11 @@ function App() {
                   </div>
 
                   <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid #EAE6DF' }}>
-                    <div style={{ marginBottom: '15px', color: '#9C898E', fontSize: '0.85rem' }}>
-                      נוסף למערכת: {formatPerfectDate(wine.dateOpened)}
-                    </div>
+                    <div style={{ marginBottom: '15px', color: '#9C898E', fontSize: '0.85rem' }}>נוסף למערכת: {formatPerfectDate(wine.dateOpened)}</div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {wine.bottleStatus === 'stored' && (
-                        <button className="btn-pill-primary" onClick={() => openBottle(wine)} style={{ flex: '1 1 100%', padding: '10px', fontSize: '1.05rem', marginBottom: '8px' }}>פתיחת בקבוק</button>
-                      )}
+                      {wine.bottleStatus === 'stored' && (<button className="btn-pill-primary" onClick={() => openBottle(wine)} style={{ flex: '1 1 100%', padding: '10px', fontSize: '1.05rem', marginBottom: '8px' }}>פתיחת בקבוק</button>)}
                       <button className="btn-pill-outline" onClick={() => editWine(wine)} style={{ flex: 1, padding: '8px 5px', fontSize: '0.95rem' }}>עריכה</button>
-                      <button 
-                        className="btn-pill-outline" 
-                        onClick={() => generateShareImage(wine)} 
-                        disabled={sharingId === wine._id}
-                        style={{ flex: 1, padding: '8px 5px', fontSize: '0.95rem', color: '#B49A65', borderColor: '#EAE6DF' }}
-                      >
-                        {sharingId === wine._id ? 'מייצר...' : 'שתף'}
-                      </button>
+                      <button className="btn-pill-outline" onClick={() => generateShareImage(wine)} disabled={sharingId === wine._id} style={{ flex: 1, padding: '8px 5px', fontSize: '0.95rem', color: '#B49A65', borderColor: '#EAE6DF' }}>{sharingId === wine._id ? 'מייצר...' : 'שתף'}</button>
                       <button className="btn-pill-outline" onClick={() => handleDelete(wine._id)} style={{ flex: 1, color: '#A34E4E', borderColor: '#EAD8D9', padding: '8px 5px', fontSize: '0.95rem' }}>מחיקה</button>
                     </div>
                   </div>
@@ -1389,45 +1058,26 @@ function App() {
 
       {currentView === 'stats' && (
         <div style={{ animation: 'fadeIn 0.5s ease', display: 'flex', flexDirection: 'column', gap: '30px' }}>
-          
           {stats ? (
             <>
               <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6', textAlign: 'center' }}>
                 <h3 className="serif-title" style={{ margin: '0 0 10px 0', fontSize: '1.5rem', color: '#572C3A' }}>סה״כ יינות במערכת</h3>
                 <span style={{ color: '#B49A65', fontSize: '4.5rem', fontWeight: 'bold', lineHeight: '1', display: 'block', marginBottom: '25px' }}>{stats.totalWines}</span>
-                
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', flexWrap: 'wrap', borderTop: '1px solid #EAE6DF', paddingTop: '25px' }}>
-                  <div style={{ flex: '1', minWidth: '120px' }}>
-                    <span style={{ color: '#572C3A', fontSize: '2.2rem', fontWeight: 'bold', display: 'block' }}>{stats.totalDrank}</span>
-                    <span style={{ color: '#7D736A', fontSize: '1rem' }}>נפתחו ונשתו</span>
-                  </div>
-                  <div style={{ flex: '1', minWidth: '120px', borderRight: '1px solid #EAE6DF', borderLeft: '1px solid #EAE6DF', padding: '0 15px' }}>
-                    <span style={{ color: '#B49A65', fontSize: '2.2rem', fontWeight: 'bold', display: 'block' }}>{stats.totalStored}</span>
-                    <span style={{ color: '#7D736A', fontSize: '1rem' }}>שוכבים באוסף</span>
-                  </div>
-                  <div style={{ flex: '1', minWidth: '120px' }}>
-                    <span style={{ color: '#4A5D23', fontSize: '2.2rem', fontWeight: 'bold', display: 'block' }}>{stats.naturalDrankCount}</span>
-                    <span style={{ color: '#7D736A', fontSize: '1rem' }}>יינות טבעיים שנשתו ({stats.naturalDrankPercentage}%)</span>
-                  </div>
+                  <div style={{ flex: '1', minWidth: '120px' }}><span style={{ color: '#572C3A', fontSize: '2.2rem', fontWeight: 'bold', display: 'block' }}>{stats.totalDrank}</span><span style={{ color: '#7D736A', fontSize: '1rem' }}>נפתחו ונשתו</span></div>
+                  <div style={{ flex: '1', minWidth: '120px', borderRight: '1px solid #EAE6DF', borderLeft: '1px solid #EAE6DF', padding: '0 15px' }}><span style={{ color: '#B49A65', fontSize: '2.2rem', fontWeight: 'bold', display: 'block' }}>{stats.totalStored}</span><span style={{ color: '#7D736A', fontSize: '1rem' }}>שוכבים באוסף</span></div>
+                  <div style={{ flex: '1', minWidth: '120px' }}><span style={{ color: '#4A5D23', fontSize: '2.2rem', fontWeight: 'bold', display: 'block' }}>{stats.naturalDrankCount}</span><span style={{ color: '#7D736A', fontSize: '1rem' }}>יינות טבעיים שנשתו ({stats.naturalDrankPercentage}%)</span></div>
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-                <div className="stat-card">
-                  <span style={{ color: '#572C3A', fontSize: '2.5rem', fontWeight: 'bold', lineHeight: '1' }}>{stats.favoriteType || '-'}</span>
-                  <span style={{ color: '#7D736A', fontSize: '1.1rem', marginTop: '10px' }}>הסוג המועדף</span>
-                </div>
-                <div className="stat-card">
-                  <span style={{ color: '#B49A65', fontSize: '2.5rem', fontWeight: 'bold', lineHeight: '1' }}>₪{stats.avgPrice}</span>
-                  <span style={{ color: '#7D736A', fontSize: '1.1rem', marginTop: '10px' }}>מחיר ממוצע (ללא מתנות)</span>
-                </div>
+                <div className="stat-card"><span style={{ color: '#572C3A', fontSize: '2.5rem', fontWeight: 'bold', lineHeight: '1' }}>{stats.favoriteType || '-'}</span><span style={{ color: '#7D736A', fontSize: '1.1rem', marginTop: '10px' }}>הסוג המועדף</span></div>
+                <div className="stat-card"><span style={{ color: '#B49A65', fontSize: '2.5rem', fontWeight: 'bold', lineHeight: '1' }}>₪{stats.avgPrice}</span><span style={{ color: '#7D736A', fontSize: '1.1rem', marginTop: '10px' }}>מחיר ממוצע (ללא מתנות)</span></div>
               </div>
 
               <div className="soft-card" style={{ padding: '25px', textAlign: 'center', border: '1px solid #EFECE6' }}>
                 <p style={{ margin: '0 0 5px 0', color: '#7D736A', fontSize: '1.1rem' }}>המדינה המובילה באוסף</p>
-                <p className="serif-title" style={{ margin: 0, fontSize: '1.8rem', color: '#572C3A', fontWeight: 'bold' }}>
-                  {getCountryFlag(stats.topCountry)} {stats.topCountry || 'טרם עודכן'}
-                </p>
+                <p className="serif-title" style={{ margin: 0, fontSize: '1.8rem', color: '#572C3A', fontWeight: 'bold' }}>{getCountryFlag(stats.topCountry)} {stats.topCountry || 'טרם עודכן'}</p>
               </div>
 
               <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
@@ -1435,26 +1085,17 @@ function App() {
                   <span style={{ color: '#7D736A', fontSize: '1.1rem', display: 'block', marginBottom: '5px' }}>ממוצע הציונים הכללי</span>
                   <span style={{ color: '#B49A65', fontSize: '3.5rem', fontWeight: 'bold', lineHeight: '1' }}>{stats.avgRating} <span style={{ fontSize: '1.5rem' }}>★</span></span>
                 </div>
-                
                 <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>ממוצע לפי מדינה</h3>
-                
                 {stats.countryAverages.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     {stats.countryAverages.map((country, idx) => (
                       <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EFECE6', paddingBottom: '10px' }}>
-                        <span style={{ fontSize: '1.2rem', fontWeight: '600', color: '#332F2C' }}>
-                          {getCountryFlag(country.name)} {country.name}
-                        </span>
-                        <div style={{ textAlign: 'left' }}>
-                          <span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.2rem' }}>{country.avg} ★</span>
-                          <span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'block' }}>מתוך {country.count} יינות</span>
-                        </div>
+                        <span style={{ fontSize: '1.2rem', fontWeight: '600', color: '#332F2C' }}>{getCountryFlag(country.name)} {country.name}</span>
+                        <div style={{ textAlign: 'left' }}><span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.2rem' }}>{country.avg} ★</span><span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'block' }}>מתוך {country.count} יינות</span></div>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <p style={{ color: '#7D736A', textAlign: 'center' }}>חסרים נתוני דירוג.</p>
-                )}
+                ) : <p style={{ color: '#7D736A', textAlign: 'center' }}>הסריקו ודרגו יינות כדי לראות נתונים.</p>}
               </div>
 
               <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
@@ -1463,20 +1104,47 @@ function App() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     {stats.topCountriesVolume.map((country, idx) => (
                       <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EFECE6', paddingBottom: '10px' }}>
-                        <span style={{ fontSize: '1.2rem', fontWeight: '600', color: '#332F2C' }}>
-                          {getCountryFlag(country.name)} {country.name}
-                        </span>
-                        <div style={{ textAlign: 'left', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                          <span style={{ color: '#BCAFA4', fontSize: '0.9rem' }}>
-                            ({country.drank} נשתו / {country.stored} באוסף)
-                          </span>
-                          <span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.3rem' }}>{country.count}</span>
-                        </div>
+                        <span style={{ fontSize: '1.2rem', fontWeight: '600', color: '#332F2C' }}>{getCountryFlag(country.name)} {country.name}</span>
+                        <div style={{ textAlign: 'left', display: 'flex', alignItems: 'baseline', gap: '8px' }}><span style={{ color: '#BCAFA4', fontSize: '0.9rem' }}>({country.drank} נשתו / {country.stored} באוסף)</span><span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.3rem' }}>{country.count}</span></div>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <p style={{ textAlign: 'center', color: '#7D736A' }}>טרם עודכן</p>
+                ) : <p style={{ textAlign: 'center', color: '#7D736A' }}>טרם עודכן</p>}
+              </div>
+
+              {/* השתיינים הגדולים - עבר בדיוק לכאן, מתחת למדינות */}
+              <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
+                <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>השתיינים הגדולים</h3>
+                
+                <div className="status-toggle" style={{ maxWidth: '300px', margin: '0 auto 25px auto' }}>
+                  <div className={`status-option ${drinkersTab === 'individuals' ? 'active' : ''}`} onClick={() => setDrinkersTab('individuals')}>בודדים</div>
+                  <div className={`status-option ${drinkersTab === 'groups' ? 'active' : ''}`} onClick={() => setDrinkersTab('groups')}>קבוצות</div>
+                </div>
+
+                {drinkersTab === 'individuals' && (
+                  stats.topIndividuals && stats.topIndividuals.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {stats.topIndividuals.map((person, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EFECE6', paddingBottom: '10px' }}>
+                          <span style={{ fontSize: '1.1rem', fontWeight: '600', color: '#332F2C' }}>{person.name}</span>
+                          <div style={{ textAlign: 'left' }}><span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.2rem' }}>{person.count}</span><span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'inline-block', marginRight: '5px' }}>יינות</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p style={{ color: '#7D736A', textAlign: 'center' }}>אין נתונים</p>
+                )}
+
+                {drinkersTab === 'groups' && (
+                  stats.topGroups && stats.topGroups.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {stats.topGroups.map((group, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EFECE6', paddingBottom: '10px' }}>
+                          <span style={{ fontSize: '1.1rem', fontWeight: '600', color: '#332F2C', maxWidth: '75%', lineHeight: '1.4' }}>{group.name}</span>
+                          <div style={{ textAlign: 'left' }}><span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.2rem' }}>{group.count}</span><span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'inline-block', marginRight: '5px' }}>יינות</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p style={{ color: '#7D736A', textAlign: 'center' }}>אין נתונים</p>
                 )}
               </div>
 
@@ -1493,16 +1161,11 @@ function App() {
                       {stats.topLocations.map((loc, idx) => (
                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EFECE6', paddingBottom: '10px' }}>
                           <span style={{ fontSize: '1.2rem', fontWeight: '600', color: '#332F2C' }}>{loc.name}</span>
-                          <div style={{ textAlign: 'left' }}>
-                            <span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.2rem' }}>{loc.count}</span>
-                            <span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'inline-block', marginRight: '5px' }}>יינות</span>
-                          </div>
+                          <div style={{ textAlign: 'left' }}><span style={{ color: '#B49A65', fontWeight: 'bold', fontSize: '1.2rem' }}>{loc.count}</span><span style={{ color: '#9C898E', fontSize: '0.9rem', display: 'inline-block', marginRight: '5px' }}>יינות</span></div>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p style={{ textAlign: 'center', color: '#7D736A' }}>טרם עודכן</p>
-                  )}
+                  ) : <p style={{ textAlign: 'center', color: '#7D736A' }}>טרם עודכן</p>}
                 </div>
               </div>
 
@@ -1530,32 +1193,18 @@ function App() {
               {stats.graphData && stats.graphData.length > 0 && (
                 <div className="soft-card" style={{ padding: '30px', backgroundColor: '#FFFFFF', border: '1px solid #EFECE6' }}>
                   <h3 className="serif-title" style={{ margin: '0 0 15px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>היסטוריית בקבוקים שנפתחו</h3>
-                  
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '25px' }}>
-                    <select 
-                      value={selectedGraphYear} 
-                      onChange={(e) => setSelectedGraphYear(Number(e.target.value))}
-                      className="filter-select"
-                      style={{ maxWidth: '180px', textAlign: 'center', fontWeight: 'bold' }}
-                    >
-                      {stats.availableYears && stats.availableYears.map(year => (
-                        <option key={year} value={year}>שנת {year}</option>
-                      ))}
+                    <select value={selectedGraphYear} onChange={(e) => setSelectedGraphYear(Number(e.target.value))} className="filter-select" style={{ maxWidth: '180px', textAlign: 'center', fontWeight: 'bold' }}>
+                      {stats.availableYears && stats.availableYears.map(year => (<option key={year} value={year}>שנת {year}</option>))}
                     </select>
                   </div>
-
                   <div style={{ width: '100%', height: '250px' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={stats.graphData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#EAE6DF" vertical={false} />
                         <XAxis dataKey="name" stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} axisLine={false} tickLine={false} />
                         <YAxis stroke="#7D736A" tick={{ fill: '#7D736A', fontSize: 12, fontFamily: 'Assistant' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                        <Tooltip 
-                          formatter={(value) => [value, 'בקבוקים']}
-                          labelFormatter={(label, payload) => payload?.[0]?.payload?.name || label}
-                          contentStyle={{ backgroundColor: '#FDFBF7', border: '1px solid #EAE6DF', borderRadius: '8px', color: '#332F2C', direction: 'rtl', fontFamily: 'Assistant' }}
-                          itemStyle={{ color: '#572C3A', fontWeight: 'bold' }}
-                        />
+                        <Tooltip formatter={(value) => [value, 'בקבוקים']} labelFormatter={(label, payload) => payload?.[0]?.payload?.name || label} contentStyle={{ backgroundColor: '#FDFBF7', border: '1px solid #EAE6DF', borderRadius: '8px', color: '#332F2C', direction: 'rtl', fontFamily: 'Assistant' }} itemStyle={{ color: '#572C3A', fontWeight: 'bold' }} />
                         <Line type="monotone" dataKey="בקבוקים" stroke="#572C3A" strokeWidth={3} dot={{ r: 5, fill: '#572C3A', stroke: '#FFFFFF', strokeWidth: 2 }} activeDot={{ r: 7, fill: '#B49A65', stroke: '#FFFFFF' }} />
                       </LineChart>
                     </ResponsiveContainer>
@@ -1564,19 +1213,12 @@ function App() {
               )}
             </>
           ) : (
-            <div className="soft-card" style={{ padding: '60px', textAlign: 'center' }}>
-              <p className="serif-title" style={{ color: '#BCAFA4', fontSize: '1.5rem', margin: 0 }}>המרתף עדיין ריק.</p>
-            </div>
+            <div className="soft-card" style={{ padding: '60px', textAlign: 'center' }}><p className="serif-title" style={{ color: '#BCAFA4', fontSize: '1.5rem', margin: 0 }}>המרתף עדיין ריק.</p></div>
           )}
         </div>
       )}
 
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
+      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }\n@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
     </div>
   )
 }

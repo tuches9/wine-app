@@ -8,20 +8,21 @@ const fs = require('fs');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const cloudinary = require('cloudinary').v2;
 const { Resend } = require('resend');
-const app = express();
 
+const app = express();
 app.use(cors());
 app.use(express.json());
 
 console.log("--- שרת מרתף היין עולה לאוויר ---");
-console.log("בדיקת מפתח Resend:", process.env.RESEND_API_KEY ? "✅ מוגדר" : "❌ חסר");
+console.log("בדיקת מפתח Resend:", process.env.RESEND_API_KEY ? "✅ מוגדר" : "❌ חסר - משתמש במפתח דמה למניעת קריסה");
 
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key');
-const resend = new Resend(process.env.RESEND_API_KEY);
+// שימוש במפתח דמה כדי שהשרת לא יקרוס בסביבה מקומית חסרת מפתח
+const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_so_it_doesnt_crash');
 
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME || 'dummy',
@@ -183,16 +184,13 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
   }
 });
 
-// מסלול ליצירת יין חדש (כולל שליחת מייל)
 app.post('/api/wines', async (req, res) => {
   try {
     const newWine = new Wine(req.body);
     await newWine.save();
     
-    // מחזירים תשובה ללקוח כדי לא לעכב את האפליקציה
     res.status(201).json({ message: 'Wine saved successfully!' });
 
-    // תהליך הרקע של המייל ליין חדש
     if (process.env.RESEND_API_KEY) {
       const wineIcon = getWineTypeIcon(newWine.wineType);
       const updateTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
@@ -244,16 +242,13 @@ app.get('/api/wines', async (req, res) => {
   }
 });
 
-// מסלול למחיקת יין (כולל שליחת מייל)
 app.delete('/api/wines/:id', async (req, res) => {
   try {
-    // שולפים את היין לפני המחיקה כדי שנדע מה השם שלו למייל
     const wineToDelete = await Wine.findById(req.params.id);
     
     await Wine.findByIdAndDelete(req.params.id);
     res.json({ message: 'Wine deleted successfully' });
 
-    // תהליך הרקע של המייל ליין שנמחק
     if (process.env.RESEND_API_KEY && wineToDelete) {
       const updateTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
       
@@ -284,7 +279,6 @@ app.delete('/api/wines/:id', async (req, res) => {
   }
 });
 
-// מסלול לעדכון יין קיים (כולל שליחת מייל משודרג)
 app.put('/api/wines/:id', async (req, res) => {
   console.log(`📬 הגיעה בקשת עריכה ליין: ${req.params.id}`);
   try {
