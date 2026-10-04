@@ -1,0 +1,15 @@
+{
+  "name": "מרתף היין",
+  "short_name": "מרתף היין",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4F2EE",
+  "theme_color": "#572C3A",
+  "icons": [
+    {
+      "src": "/wine-icon-modern.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
