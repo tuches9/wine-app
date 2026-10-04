@@ -37,7 +37,7 @@ function App() {
   const [expandedCards, setExpandedCards] = useState({});
   const [sharingId, setSharingId] = useState(null);
 
-  // הנה השינוי שלנו - הכתובת באוויר תהיה ריקה כדי לפנות לאותו שרת
+  // התיקון: הכתובת באוויר היא כתובת ריקה ('') כדי שהלקוח יפנה לשרת של עצמו באורקל
   const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000' 
     : '';
