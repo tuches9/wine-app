@@ -378,9 +378,11 @@ app.put('/api/wines/:id', async (req, res) => {
   }
 });
 
-// תיקון: הגשת קבצי ה-Frontend (React) ב-Production מתוך התיקייה הנכונה!
+// הגשת קבצי ה-Frontend (React) ב-Production
 app.use(express.static(path.join(__dirname, 'client', 'dist')));
-app.get('*', (req, res) => {
+
+// התיקון לקריסת Express: שימוש ב-app.use במקום app.get('*')
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'client', 'dist', 'index.html'));
 });
 
