@@ -28,18 +28,19 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('הכל');
   const [filterCountry, setFilterCountry] = useState('הכל');
-  const [filterPersons, setFilterPersons] = useState([]); // שונה למערך לטובת סינון מרובה
+  const [filterPersons, setFilterPersons] = useState([]);
   const [sortOption, setSortOption] = useState('dateDrank_desc');
   
   const [selectedGraphYear, setSelectedGraphYear] = useState(new Date().getFullYear());
-  const [drinkersTab, setDrinkersTab] = useState('individuals'); // מצב הטאב במסך השתיינים הגדולים
+  const [drinkersTab, setDrinkersTab] = useState('individuals');
 
   const [expandedCards, setExpandedCards] = useState({});
   const [sharingId, setSharingId] = useState(null);
 
+  // הנה השינוי שלנו - הכתובת באוויר תהיה ריקה כדי לפנות לאותו שרת
   const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000' 
-    : 'https://wine-app-server.onrender.com';
+    : '';
 
   const fetchWines = async () => {
     try {
@@ -463,7 +464,6 @@ function App() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // חישוב שותפים נפרד ליחידים ולהרכבים
     const individualCounts = {};
     const groupCounts = {};
 
@@ -471,14 +471,12 @@ function App() {
       if (w.drankWith && w.drankWith.trim() !== '') {
         const people = w.drankWith.split(',').map(s => s.trim()).filter(Boolean);
         
-        // סופר כל אדם כאינדיבידואל
         people.forEach(p => {
           individualCounts[p] = (individualCounts[p] || 0) + 1;
         });
 
-        // אם יש יותר מאדם אחד, סופר כהרכב זוגי/קבוצתי עם מפריד של פסיק
         if (people.length > 1) {
-          const groupName = [...people].sort().join(', '); // שינוי לפסיק במקום פלוס
+          const groupName = [...people].sort().join(', ');
           groupCounts[groupName] = (groupCounts[groupName] || 0) + 1;
         }
       }
@@ -589,7 +587,6 @@ function App() {
       const matchesType = filterType === 'הכל' || wine.wineType === filterType;
       const matchesCountry = filterCountry === 'הכל' || wine.country === filterCountry;
       
-      // לוגיקת AND מרובה עבור שותפים לטעימה
       const matchesPerson = filterPersons.length === 0 || filterPersons.every(person => {
         if (!wine.drankWith) return false;
         const winePeople = wine.drankWith.split(',').map(s=>s.trim());
@@ -827,7 +824,6 @@ function App() {
                     <div><label style={labelStyle}>מיקום הטעימה</label><input className="soft-input" name="location" value={formData.location} onChange={handleChange} /></div>
                   </div>
                   
-                  {/* אזור השותפים - תגיות, הוספה מהירה, והשלמה */}
                   <div>
                     <label style={labelStyle}>שותפים לטעימה</label>
                     
@@ -925,7 +921,6 @@ function App() {
               {uniqueCountries.map(country => (<option key={country} value={country}>{country === 'הכל' ? 'כל המדינות' : country}</option>))}
             </select>
             
-            {/* סינון מרובה שותפים עם צ'יפים */}
             <div style={{ flex: 1, minWidth: '120px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <select 
                 value="" 
@@ -1112,7 +1107,6 @@ function App() {
                 ) : <p style={{ textAlign: 'center', color: '#7D736A' }}>טרם עודכן</p>}
               </div>
 
-              {/* השתיינים הגדולים - עבר בדיוק לכאן, מתחת למדינות */}
               <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
                 <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>השתיינים הגדולים</h3>
                 
@@ -1224,4 +1218,5 @@ function App() {
 }
 
 const labelStyle = { fontSize: '0.9rem', color: '#7D736A', marginBottom: '8px', display: 'block', fontWeight: '600' };
+
 export default App;

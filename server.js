@@ -21,7 +21,6 @@ app.get('/health', (req, res) => {
 });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key');
-// שימוש במפתח דמה כדי שהשרת לא יקרוס בסביבה מקומית חסרת מפתח
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_so_it_doesnt_crash');
 
 cloudinary.config({
@@ -296,27 +295,7 @@ app.put('/api/wines/:id', async (req, res) => {
       let changesHtml = '';
       
       const fieldsToCheck = {
-        name: 'שם היין', 
-        producer: 'יצרן / Domaine', 
-        vintage: 'שנת בציר', 
-        wineType: 'סוג היין',
-        country: 'מדינה',
-        region: 'אזור',
-        grapes: 'זני ענבים',
-        price: 'מחיר (₪)',
-        bottleStatus: 'סטטוס הבקבוק', 
-        rating: 'ציון אישי', 
-        tastingNotes: 'רשמי טעימה', 
-        drinkWindow: 'חלון שתייה', 
-        memory: 'זיכרון',
-        location: 'מיקום הטעימה',
-        drankWith: 'שותפים לטעימה',
-        aiInsights: 'הסומלייה הדיגיטלי (AI)',
-        acidity: 'חומציות (1-5)',
-        sweetness: 'מתיקות (1-5)',
-        body: 'גוף (1-5)',
-        tannins: 'טאנינים (1-5)',
-        alcohol: 'אלכוהול (1-5)'
+        name: 'שם היין', producer: 'יצרן / Domaine', vintage: 'שנת בציר', wineType: 'סוג היין', country: 'מדינה', region: 'אזור', grapes: 'זני ענבים', price: 'מחיר (₪)', bottleStatus: 'סטטוס הבקבוק', rating: 'ציון אישי', tastingNotes: 'רשמי טעימה', drinkWindow: 'חלון שתייה', memory: 'זיכרון', location: 'מיקום הטעימה', drankWith: 'שותפים לטעימה', aiInsights: 'הסומלייה הדיגיטלי (AI)', acidity: 'חומציות (1-5)', sweetness: 'מתיקות (1-5)', body: 'גוף (1-5)', tannins: 'טאנינים (1-5)', alcohol: 'אלכוהול (1-5)'
       };
 
       for (const key in fieldsToCheck) {
@@ -387,6 +366,20 @@ app.put('/api/wines/:id', async (req, res) => {
     }
   }
 });
+
+// --- השינוי שלנו עבור ענן אורקל: הגשת קבצי ה-Frontend ---
+const clientDistPath = path.join(__dirname, 'dist');
+app.use(express.static(clientDistPath));
+
+app.get(/.*/, (req, res) => {
+    // אם מישהו ניסה לפנות ל-API שלא קיים, נחזיר לו שגיאת 404 תקינה
+    if (req.originalUrl.startsWith('/api')) {
+        return res.status(404).json({ error: 'API route not found' });
+    }
+    // אחרת, ניתן לריאקט (הלקוח) לטפל בבקשה ולהציג את האפליקציה
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+});
+// --------------------------------------------------------
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
