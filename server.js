@@ -12,12 +12,14 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
 console.log("--- שרת מרתף היין עולה לאוויר ---");
 console.log("בדיקת מפתח Resend:", process.env.RESEND_API_KEY ? "✅ מוגדר" : "❌ חסר - משתמש במפתח דמה למניעת קריסה");
 
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key');
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_so_it_doesnt_crash');
 
@@ -26,17 +28,21 @@ cloudinary.config({
   api_key: process.env.CLOUD_API_KEY || 'dummy',
   api_secret: process.env.CLOUD_API_SECRET || 'dummy'
 });
+
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) { fs.mkdirSync(uploadDir); }
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) { cb(null, 'uploads/') },
   filename: function (req, file, cb) { cb(null, Date.now() + '-' + file.originalname) }
 });
 const upload = multer({ storage: storage });
+
 const mongoURI = 'mongodb+srv://ilay_admin:120766ely@cluster0.whmntq6.mongodb.net/?appName=Cluster0';
 mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 5000 })
   .then(() => console.log('✅ חיבור למסד הנתונים הצליח!'))
   .catch((err) => console.error('❌ שגיאה בחיבור למסד הנתונים:', err.message));
+
 const wineSchema = new mongoose.Schema({
   imageUrl: String,
   name: String,
@@ -53,6 +59,8 @@ const wineSchema = new mongoose.Schema({
   dateDrank: String,
   rating: Number,
   location: String,
+  lat: { type: Number, default: null }, // NEW: קו רוחב למפה
+  lng: { type: Number, default: null }, // NEW: קו אורך למפה
   drankWith: String,
   aiInsights: String, 
   drinkWindow: String,
@@ -66,7 +74,9 @@ const wineSchema = new mongoose.Schema({
   tannins: { type: Number, default: 1 },
   alcohol: { type: Number, default: 1 }
 });
+
 const Wine = mongoose.model('Wine', wineSchema);
+
 const getWineTypeIcon = (type) => {
   switch (type) {
     case 'אדום': return '🍷 יין אדום';
@@ -380,8 +390,6 @@ app.put('/api/wines/:id', async (req, res) => {
 
 // הגשת קבצי ה-Frontend (React) ב-Production
 app.use(express.static(path.join(__dirname, 'client', 'dist')));
-
-// התיקון לקריסת Express: שימוש ב-app.use במקום app.get('*')
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'client', 'dist', 'index.html'));
 });
