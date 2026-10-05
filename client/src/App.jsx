@@ -1,7 +1,59 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import heic2any from 'heic2any';
 import html2canvas from 'html2canvas';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// פונקציה ליצירת אייקון מותאם אישית בסגנון אייפון (תמונה + כמות)
+const createCustomIcon = (wines) => {
+  const fallbackImage = 'https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80';
+  const firstImage = wines.find(w => w.imageUrl)?.imageUrl || fallbackImage;
+  const count = wines.length;
+  
+  const html = `
+    <div class="ios-marker" style="width: 55px; height: 55px;">
+      <img src="${firstImage}" onError="this.onerror=null;this.src='${fallbackImage}';" />
+      ${count > 1 ? `<span class="ios-marker-badge">${count}</span>` : ''}
+    </div>
+  `;
+  
+  return L.divIcon({ 
+    html, 
+    className: '', 
+    iconSize: [55, 55], 
+    iconAnchor: [27, 63], // כדי שהשפיץ יצביע בדיוק על המיקום
+    popupAnchor: [0, -65] 
+  });
+};
+
+// אייקון לנעץ בחירת המיקום בטופס
+const pickerIcon = L.divIcon({
+    html: '<div style="font-size:35px; text-shadow: 0 2px 5px rgba(0,0,0,0.3); margin-top:-35px; margin-left:-17px;">📍</div>',
+    className: '', 
+    iconSize: [35, 35], 
+    iconAnchor: [0, 0]
+});
+
+// קומפוננטת עזר לבחירת מיקום על המפה בטופס העריכה
+function LocationPickerMarker({ position, setPosition }) {
+  useMapEvents({
+      click(e) {
+          setPosition(e.latlng);
+      }
+  });
+  return position ? <Marker position={position} icon={pickerIcon} /> : null;
+}
+
+const countryCoordinates = {
+  'ישראל': { lat: 31.0461, lng: 34.8516 }, 'צרפת': { lat: 46.2276, lng: 2.2137 }, 'איטליה': { lat: 41.8719, lng: 12.5674 },
+  'ספרד': { lat: 40.4637, lng: -3.7492 }, 'גאורגיה': { lat: 42.3154, lng: 43.3569 }, 'ארגנטינה': { lat: -38.4161, lng: -63.6167 },
+  'צ\'ילה': { lat: -35.6751, lng: -71.5430 }, 'ארצות הברית': { lat: 37.0902, lng: -95.7129 }, 'ארה"ב': { lat: 37.0902, lng: -95.7129 },
+  'גרמניה': { lat: 51.1657, lng: 10.4515 }, 'דרום אפריקה': { lat: -30.5595, lng: 22.9375 }, 'ניו זילנד': { lat: -40.9006, lng: 174.8860 },
+  'אוסטרליה': { lat: -25.2744, lng: 133.7751 }, 'פורטוגל': { lat: 39.3999, lng: -8.2245 }, 'יוון': { lat: 39.0742, lng: 21.8243 },
+  'אוסטריה': { lat: 47.5162, lng: 14.5501 }
+};
 
 function App() {
   const currentYear = new Date().getFullYear();
@@ -10,7 +62,7 @@ function App() {
   const initialFormState = {
     name: '', producer: '', wineType: 'אדום', country: '', region: '', 
     grapes: '', vintage: currentYear, isNatural: false, price: '', isGift: false, rating: 5.0, 
-    location: '', drankWith: [], dateDrank: today, aiInsights: '', drinkWindow: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
+    location: '', lat: null, lng: null, drankWith: [], dateDrank: today, aiInsights: '', drinkWindow: '', tastingNotes: '', memory: '', additionalNotes: '', imageUrl: '',
     bottleStatus: 'drank',
     acidity: 1, sweetness: 1, body: 1, tannins: 1, alcohol: 1 
   };
@@ -24,20 +76,21 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [currentView, setCurrentView] = useState('scan'); 
   const [cellarTab, setCellarTab] = useState('drank'); 
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('הכל');
   const [filterCountry, setFilterCountry] = useState('הכל');
-  const [filterPersons, setFilterPersons] = useState([]);
+  const [filterPersons, setFilterPersons] = useState([]); 
   const [sortOption, setSortOption] = useState('dateDrank_desc');
-  
+
   const [selectedGraphYear, setSelectedGraphYear] = useState(new Date().getFullYear());
-  const [drinkersTab, setDrinkersTab] = useState('individuals');
+  const [drinkersTab, setDrinkersTab] = useState('individuals'); 
+  const [mapTab, setMapTab] = useState('locations');
+  const [showMapPicker, setShowMapPicker] = useState(false);
 
   const [expandedCards, setExpandedCards] = useState({});
   const [sharingId, setSharingId] = useState(null);
 
-  // התיקון: הכתובת באוויר היא כתובת ריקה ('') כדי שהלקוח יפנה לשרת של עצמו באורקל
   const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000' 
     : '';
@@ -48,9 +101,7 @@ function App() {
       if (!response.ok) throw new Error('Network error');
       const data = await response.json();
       setWinesList(data);
-    } catch (error) { 
-      console.error('שגיאה במשיכת היינות', error); 
-    }
+    } catch (error) { console.error('שגיאה במשיכת היינות', error); }
   };
 
   useEffect(() => { fetchWines(); }, []);
@@ -65,6 +116,29 @@ function App() {
       }
       return newData;
     });
+  };
+
+  const handleGetCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setFormData(prev => ({
+            ...prev,
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            location: prev.location.trim() === '' ? 'מיקום נוכחי' : prev.location
+          }));
+          alert('📍 המיקום שלך נשמר בהצלחה על סמך ה-GPS ויצורף לשם שהקלדת!');
+          setShowMapPicker(true);
+        },
+        (error) => {
+          alert('שגיאה: לא הצלחנו לקבל את המיקום שלך. ודא שאישרת גישה למיקום בדפדפן.');
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      alert('הדפדפן שלך אינו תומך בשירותי מיקום.');
+    }
   };
 
   const handleStatusChange = (status) => {
@@ -99,7 +173,7 @@ function App() {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          
+
           canvas.toBlob((blob) => {
             resolve(new File([blob], "compressed.jpg", { type: 'image/jpeg' }));
           }, 'image/jpeg', 0.7); 
@@ -111,7 +185,7 @@ function App() {
   const handleImageChange = async (e) => {
     let file = e.target.files[0];
     if (!file) return;
-    
+
     setIsAnalyzing(true); 
 
     if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif') || file.type === 'image/heic') {
@@ -125,31 +199,31 @@ function App() {
 
     const compressedFile = await resizeImage(file);
     setPreviewUrl(URL.createObjectURL(compressedFile)); 
-    
+
     try {
       const imageFormData = new FormData();
       imageFormData.append('image', compressedFile);
       const response = await fetch(`${API_BASE_URL}/api/analyze`, { method: 'POST', body: imageFormData });
       const data = await response.json();
-      
+
       if (!response.ok) {
         console.error("Server returned an error:", data.details);
-        alert(`הייתה בעיה בסריקת התווית: \n${data.details || 'ה-AI לא הצליח לקרוא את התמונה.'}\n\nנסה לצלם שוב בזווית ישרה ותאורה טובה יותר.`);
+        alert(`הייתה בעיה בסריקת התווית:\n${data.details || 'ה-AI לא הצליח לקרוא את התמונה.'}\n\nנסה לצלם שוב בזווית ישרה ותאורה טובה יותר.`);
         return; 
       }
-      
+
       let insightsText = '';
       if (data.analyzedData.aiInsightsArray && Array.isArray(data.analyzedData.aiInsightsArray)) {
           insightsText = '• ' + data.analyzedData.aiInsightsArray.join('\n\n• ');
       }
-      
+
       setFormData(prev => ({ 
           ...prev, 
           ...data.analyzedData, 
           imageUrl: data.imageUrl,
           aiInsights: insightsText
       }));
-      
+
     } catch (error) { 
         console.error("Communication error:", error);
         alert('בעיית תקשורת מול השרת. ודא שהאינטרנט תקין ונסה שוב בעוד רגע.'); 
@@ -169,18 +243,31 @@ function App() {
       payload.drankWith = payload.drankWith.join(', ');
     }
 
+    if (payload.location && payload.location.trim() !== '' && !payload.lat && !payload.lng) {
+       try {
+         const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(payload.location)}`);
+         const geoData = await geoRes.json();
+         if (geoData && geoData.length > 0) {
+           payload.lat = parseFloat(geoData[0].lat);
+           payload.lng = parseFloat(geoData[0].lon);
+         }
+       } catch (geoErr) {
+         console.log("Geocoding failed", geoErr);
+       }
+    }
+
     try {
       const response = await fetch(url, {
         method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
-      
+
       if (response.ok) {
         setEditingId(null);
-        
+        setShowMapPicker(false);
         const newTab = formData.bottleStatus === 'stored' ? 'stored' : 'drank';
         setCellarTab(newTab);
         setSortOption(newTab === 'stored' ? 'dateOpened_desc' : 'dateDrank_desc');
-        
+
         setFormData(initialFormState);
         setPersonInput('');
         setPreviewUrl(null);
@@ -216,6 +303,7 @@ function App() {
     setEditingId(wine._id);
     setFormData({ ...initialFormState, ...wine, bottleStatus: 'drank', dateDrank: today, drankWith: parseDrankWith(wine.drankWith) });
     setPreviewUrl(wine.imageUrl);
+    setShowMapPicker(false);
     setCurrentView('scan'); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -224,6 +312,7 @@ function App() {
     setEditingId(wine._id);
     setFormData({ ...initialFormState, ...wine, bottleStatus: wine.bottleStatus, drankWith: parseDrankWith(wine.drankWith), acidity: Number(wine.acidity) || 1, sweetness: Number(wine.sweetness) || 1, body: Number(wine.body) || 1, tannins: Number(wine.tannins) || 1, alcohol: Number(wine.alcohol) || 1 });
     setPreviewUrl(wine.imageUrl);
+    setShowMapPicker(false);
     setCurrentView('scan'); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -296,10 +385,10 @@ function App() {
             ${getCountryFlag(wine.country)} ${wine.country || ''} • ${wine.producer || ''} ${wine.vintage ? `• ${wine.vintage}` : ''}
           </p>
           <div>${typeLabel} ${wine.isNatural ? `<span style="display: inline-block; background-color: #4A5D23; color: white; padding: 6px 16px; border-radius: 50px; font-size: 1.1rem; font-weight: bold; margin-bottom: 20px; margin-right: 10px;">טבעי</span>` : ''}</div>
-          
+
           ${notesHtml}
           ${memoryHtml}
-          
+
           <div style="margin-top: auto; text-align: center; padding-top: 20px; border-top: 1px solid #EAE6DF; display: flex; justify-content: center; align-items: center; gap: 10px;">
             <h3 style="margin: 0; font-family: 'Frank Ruhl Libre', serif; color: #572C3A; font-size: 1.4rem;">מרתף היין</h3>
             <span style="color: #B49A65; font-size: 1.1rem; font-family: 'Frank Ruhl Libre', serif; font-style: italic;">של עילי וגילי</span>
@@ -381,7 +470,7 @@ function App() {
     if (name.includes('ספרד')) return '🇪🇸';
     if (name.includes('גאורגיה') || name.includes('גורגיה')) return '🇬🇪';
     if (name.includes('ארגנטינה')) return '🇦🇷';
-    if (name.includes('צ\'ילה') || name.includes('צילה')) return '🇨🇱';
+    if (name.includes("צ'ילה") || name.includes('צילה')) return '🇨🇱';
     if (name.includes('ארצות הברית') || name.includes('ארה"ב') || name.includes('ארה״ב')) return '🇺🇸';
     if (name.includes('גרמניה')) return '🇩🇪';
     if (name.includes('דרום אפריקה')) return '🇿🇦';
@@ -418,7 +507,7 @@ function App() {
     if (name.includes('אירלנד')) return '🇮🇪';
     if (name.includes('נורווגיה') || name.includes('נורבגיה')) return '🇳🇴';
     if (name.includes('דנמרק')) return '🇩🇰';
-    if (name.includes('צ\'כיה') || name.includes('צכיה')) return '🇨🇿';
+    if (name.includes("צ'כיה") || name.includes('צכיה')) return '🇨🇿';
     if (name.includes('פינלנד')) return '🇫🇮';
     if (name.includes('קולומביה')) return '🇨🇴';
     if (name.includes('פרו')) return '🇵🇪';
@@ -434,7 +523,7 @@ function App() {
 
     const drankWines = winesList.filter(w => w.bottleStatus !== 'stored');
     const storedWines = winesList.filter(w => w.bottleStatus === 'stored');
-    
+
     const totalWines = winesList.length;
     const naturalDrankCount = drankWines.filter(w => w.isNatural).length;
     const naturalDrankPercentage = drankWines.length > 0 ? Math.round((naturalDrankCount / drankWines.length) * 100) : 0;
@@ -443,7 +532,7 @@ function App() {
       const counts = arr.reduce((acc, val) => { if(val && val.trim() !== '') acc[val] = (acc[val] || 0) + 1; return acc; }, {});
       return Object.keys(counts).length ? Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b) : '-';
     };
-    
+
     const grapesList = winesList.flatMap(w => w.grapes ? w.grapes.split(/[,/]+/).map(g => g.trim()).filter(g => g !== '') : []);
     const topGrape = getMode(grapesList);
 
@@ -470,13 +559,13 @@ function App() {
     drankWines.forEach(w => {
       if (w.drankWith && w.drankWith.trim() !== '') {
         const people = w.drankWith.split(',').map(s => s.trim()).filter(Boolean);
-        
+
         people.forEach(p => {
           individualCounts[p] = (individualCounts[p] || 0) + 1;
         });
 
         if (people.length > 1) {
-          const groupName = [...people].sort().join(', ');
+          const groupName = [...people].sort().join(', '); 
           groupCounts[groupName] = (groupCounts[groupName] || 0) + 1;
         }
       }
@@ -563,9 +652,35 @@ function App() {
       };
     });
 
+    // הכנת קבוצות למפה איפה שתינו (מקווצים יינות לפי קואורדינטות זהות)
+    const groupedLocations = {};
+    drankWines.forEach(w => {
+      if (w.lat && w.lng) {
+          const key = `${w.lat.toFixed(4)},${w.lng.toFixed(4)}`; // מזהה ייחודי למיקום
+          if(!groupedLocations[key]) {
+              groupedLocations[key] = { lat: w.lat, lng: w.lng, name: w.location, wines: [] };
+          }
+          groupedLocations[key].wines.push(w);
+      }
+    });
+    const mapLocations = Object.values(groupedLocations);
+
+    // הכנת קבוצות למפה השנייה (מאיפה הבקבוק)
+    const groupedOrigins = {};
+    winesList.forEach(w => {
+      const c = (w.country || '').trim();
+      if (c && countryCoordinates[c]) {
+         if(!groupedOrigins[c]) {
+             groupedOrigins[c] = { lat: countryCoordinates[c].lat, lng: countryCoordinates[c].lng, name: c, wines: [] };
+         }
+         groupedOrigins[c].wines.push(w);
+      }
+    });
+    const originsMapLocations = Object.values(groupedOrigins);
+
     return { 
         totalWines, totalDrank: drankWines.length, totalStored: storedWines.length, naturalDrankCount, naturalDrankPercentage, topGrape,
-        avgRating, avgPrice, favoriteType, topLocations, topIndividuals, topGroups, topCountriesVolume, topCountry, bestWine, countryAverages, graphData, availableYears 
+        avgRating, avgPrice, favoriteType, topLocations, topIndividuals, topGroups, topCountriesVolume, topCountry, bestWine, countryAverages, graphData, availableYears, mapLocations, originsMapLocations
     };
   };
 
@@ -583,16 +698,16 @@ function App() {
         (wine.region && wine.region.toLowerCase().includes(term)) ||
         (wine.grapes && wine.grapes.toLowerCase().includes(term)) ||
         (wine.location && wine.location.toLowerCase().includes(term));
-        
+
       const matchesType = filterType === 'הכל' || wine.wineType === filterType;
       const matchesCountry = filterCountry === 'הכל' || wine.country === filterCountry;
-      
+
       const matchesPerson = filterPersons.length === 0 || filterPersons.every(person => {
         if (!wine.drankWith) return false;
         const winePeople = wine.drankWith.split(',').map(s=>s.trim());
         return winePeople.includes(person);
       });
-      
+
       return matchesSearch && matchesType && matchesCountry && matchesPerson;
     });
 
@@ -668,6 +783,51 @@ function App() {
     .profile-label-container { display: flex; justify-content: space-between; color: #9C898E; font-size: 0.8rem; margin-top: 4px; }
     .responsive-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .responsive-grid-complex { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background-color: #F8F7F5; padding: 20px; border-radius: 24px; margin-top: 10px; }
+    
+    /* Custom Leaflet Map styling */
+    .leaflet-container { width: 100%; height: 100%; font-family: 'Assistant', sans-serif; z-index: 1; }
+    .custom-map-popup .leaflet-popup-content-wrapper { border-radius: 12px; padding: 5px; text-align: right; direction: rtl; }
+    .custom-map-popup .leaflet-popup-content { margin: 10px; font-size: 1rem; color: #332F2C; }
+    
+    /* CSS for iOS Style Marker */
+    .ios-marker {
+      background: white;
+      border-radius: 12px;
+      padding: 3px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .ios-marker::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 10px 10px 0;
+      border-style: solid;
+      border-color: white transparent transparent transparent;
+    }
+    .ios-marker img {
+      border-radius: 9px;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .ios-marker-badge {
+      position: absolute;
+      bottom: -6px;
+      left: -6px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: bold;
+      border: 2px solid white;
+    }
 
     @media (max-width: 600px) {
       .nav-item { padding: 8px 15px; font-size: 0.95rem; }
@@ -682,7 +842,7 @@ function App() {
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px', direction: 'rtl' }}>
       <style>{modernStyles}</style>
-      
+
       <div style={{ textAlign: 'center', margin: '20px 0' }}>
         <h1 className="serif-title" style={{ color: '#572C3A', fontSize: '2.5rem', margin: '0 0 5px 0' }}>מרתף היין</h1>
         <p className="serif-title" style={{ color: '#B49A65', fontSize: '1.2rem', margin: 0, fontStyle: 'italic' }}>של עילי וגילי</p>
@@ -708,7 +868,7 @@ function App() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               <div style={{ textAlign: 'center', marginBottom: '10px' }}>
                 {previewUrl && <img src={previewUrl} style={{ width: '100%', maxHeight: '350px', objectFit: 'contain', marginBottom: '20px', borderRadius: '20px', backgroundColor: '#F8F7F5', padding: '10px' }} />}
-                
+
                 {!isAnalyzing && (
                   <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
                     <label className="btn-pill-primary" style={{ display: 'inline-block', padding: '12px 25px', boxShadow: '0 5px 15px rgba(87, 44, 58, 0.2)', cursor: 'pointer', margin: 0 }}>
@@ -751,7 +911,7 @@ function App() {
                 <div><label style={labelStyle}>זני ענבים</label><input className="soft-input" name="grapes" value={formData.grapes} onChange={handleChange} /></div>
                 <div><label style={labelStyle}>שנת בציר</label><input className="soft-input" type="number" name="vintage" value={formData.vintage} onChange={handleChange} /></div>
               </div>
-              
+
               <div>
                 <label style={labelStyle}>חלון שתייה מומלץ (הערכת AI)</label>
                 <input className="soft-input" name="drinkWindow" value={formData.drinkWindow || ''} onChange={handleChange} placeholder="לדוגמה: 2024-2028 או מוכן לשתייה" />
@@ -821,12 +981,74 @@ function App() {
 
                   <div className="responsive-grid">
                     <div><label style={labelStyle}>תאריך טעימה</label><input className="soft-input" type="date" name="dateDrank" value={formData.dateDrank || ''} onChange={handleChange} /></div>
-                    <div><label style={labelStyle}>מיקום הטעימה</label><input className="soft-input" name="location" value={formData.location} onChange={handleChange} /></div>
+                    
+                    {/* אזור המיקום החדש עם מפת הבחירה */}
+                    <div>
+                      <label style={labelStyle}>מיקום הטעימה</label>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                           <input 
+                             className="soft-input" 
+                             name="location" 
+                             value={formData.location} 
+                             onChange={handleChange} 
+                             placeholder='הקלד שם חופשי, למשל "הבית של עילי"' 
+                           />
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => setShowMapPicker(!showMapPicker)}
+                          className="btn-pill-outline" 
+                          style={{ padding: '0 15px', margin: 0, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', backgroundColor: showMapPicker ? '#F8F7F5' : '#FFFFFF' }}
+                          title="פתח מפה לסימון מיקום ידני"
+                        >
+                          🗺️
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={handleGetCurrentLocation}
+                          className="btn-pill-outline" 
+                          style={{ padding: '0 15px', margin: 0, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', backgroundColor: '#FFFFFF' }}
+                          title="שמור את המיקום הנוכחי למפה (GPS)"
+                        >
+                          📍
+                        </button>
+                      </div>
+                      
+                      {/* מפה קטנה לבחירת מיקום ידנית בעריכה/הוספה */}
+                      {showMapPicker && (
+                         <div style={{ height: '300px', width: '100%', marginTop: '15px', borderRadius: '16px', overflow: 'hidden', border: '1px solid #EAE6DF', position: 'relative', animation: 'fadeIn 0.3s ease' }}>
+                            <MapContainer 
+                               center={formData.lat ? [formData.lat, formData.lng] : [32.0853, 34.7818]} 
+                               zoom={12} 
+                               style={{height: '100%', width: '100%', zIndex: 10}}
+                            >
+                               <TileLayer 
+                                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+                                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                               />
+                               <LocationPickerMarker 
+                                   position={formData.lat ? {lat: formData.lat, lng: formData.lng} : null}
+                                   setPosition={(pos) => setFormData(prev => ({...prev, lat: pos.lat, lng: pos.lng}))}
+                               />
+                            </MapContainer>
+                            <div style={{position: 'absolute', bottom: '10px', left: '10px', right: '10px', zIndex: 1000, textAlign: 'center', pointerEvents: 'none'}}>
+                               <span style={{backgroundColor: 'rgba(255,255,255,0.9)', padding: '5px 15px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold', color: '#572C3A', boxShadow: '0 2px 10px rgba(0,0,0,0.1)'}}>
+                                  לחץ על המפה בכל מקום כדי לשמור נ.צ
+                               </span>
+                            </div>
+                         </div>
+                      )}
+                      
+                      <span style={{ fontSize: '0.8rem', color: '#9C898E', display: 'block', marginTop: '5px' }}>
+                         הקלד שם ולחץ 📍 למיקומך הנוכחי, או 🗺️ לבחירת מיקום במפה מהעבר.
+                      </span>
+                    </div>
                   </div>
-                  
+
                   <div>
                     <label style={labelStyle}>שותפים לטעימה</label>
-                    
+
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.85rem', color: '#9C898E', alignSelf: 'center', fontWeight: '600' }}>הוספה מהירה:</span>
                       {['עילי', 'גילי'].map(name => (
@@ -897,7 +1119,7 @@ function App() {
                   {isSaving ? 'שומר...' : (editingId ? 'שמירת שינויים' : 'הוספה למערכת')}
                 </button>
                 {editingId && (
-                  <button className="btn-pill-outline" type="button" onClick={() => {setEditingId(null); setFormData(initialFormState); setPersonInput(''); setPreviewUrl(null); setCurrentView('cellar');}} style={{ flex: 1 }}>ביטול</button>
+                  <button className="btn-pill-outline" type="button" onClick={() => {setEditingId(null); setFormData(initialFormState); setPersonInput(''); setPreviewUrl(null); setShowMapPicker(false); setCurrentView('cellar');}} style={{ flex: 1 }}>ביטול</button>
                 )}
               </div>
             </form>
@@ -920,7 +1142,7 @@ function App() {
             <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="filter-select">
               {uniqueCountries.map(country => (<option key={country} value={country}>{country === 'הכל' ? 'כל המדינות' : country}</option>))}
             </select>
-            
+
             <div style={{ flex: 1, minWidth: '120px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <select 
                 value="" 
@@ -954,7 +1176,7 @@ function App() {
               <option value="price_desc">מחיר (מהיקר לזול)</option><option value="country_asc">לפי מדינה (א-ת)</option>
             </select>
           </div>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '35px', alignItems: 'start' }}>
             {sortedAndFilteredWines.map((wine) => {
               const typeStyle = getWineTypeStyle(wine.wineType);
@@ -965,14 +1187,14 @@ function App() {
                 { subject: 'טאנינים', originalName: 'טאנינים', A: Number(wine.tannins) || 1, fullMark: 5 },
                 { subject: 'אלכוהול', originalName: 'אלכוהול', A: Number(wine.alcohol) || 1, fullMark: 5 },
               ];
-              
+
               return (
               <div key={wine._id} className="soft-card" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '20px', backgroundColor: '#F8F7F5', display: 'flex', justifyContent: 'center', position: 'relative' }}>
                   {wine.imageUrl ? <img src={wine.imageUrl} style={{ width: '100%', height: '280px', objectFit: 'contain', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.1))' }} /> : <div style={{ width: '100%', height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#BCAFA4' }}>ללא תמונה</div>}
                   {wine.bottleStatus === 'stored' && <div style={{ position: 'absolute', top: '15px', right: '15px', backgroundColor: '#572C3A', color: 'white', padding: '5px 12px', borderRadius: '50px', fontSize: '0.85rem', fontWeight: 'bold' }}>שמור באוסף</div>}
                 </div>
-                
+
                 <div style={{ padding: '30px', display: 'flex', flexDirection: 'column', flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                     <h3 className="serif-title" style={{ margin: '0', color: '#2B2624', fontSize: '1.6rem', lineHeight: '1.2' }}>{wine.name}</h3>
@@ -980,14 +1202,14 @@ function App() {
                   </div>
                   <p style={{ color: '#7D736A', fontSize: '1rem', margin: '0 0 5px 0', letterSpacing: '0.5px' }}>{getCountryFlag(wine.country)} {wine.country}{wine.region ? ` (${wine.region})` : ''} • {wine.producer} {wine.vintage ? `• ${wine.vintage}` : ''}</p>
                   {wine.grapes && <p style={{ color: '#9C898E', fontSize: '0.95rem', margin: '0 0 20px 0' }}>זני ענבים: <span style={{fontWeight: '600', color: '#7D736A'}}>{wine.grapes}</span></p>}
-                  
+
                   {wine.bottleStatus === 'stored' && wine.drinkWindow && (
                     <div style={{ padding: '12px 15px', backgroundColor: '#FDFBF7', borderRadius: '12px', border: '1px solid #EAE6DF', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontSize: '1.2rem' }}>⏳</span>
                       <div><span style={{ display: 'block', color: '#9C898E', fontSize: '0.85rem' }}>חלון שתייה</span><span style={{ color: '#572C3A', fontWeight: 'bold', fontSize: '1rem' }}>{wine.drinkWindow}</span></div>
                     </div>
                   )}
-                  
+
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '25px', alignItems: 'center' }}>
                     <span style={{ ...typeStyle, padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>{wine.wineType}</span>
                     {wine.isNatural && <span style={{ color: '#4A5D23', backgroundColor: '#F3F6EB', padding: '6px 16px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '600' }}>טבעי</span>}
@@ -1107,9 +1329,96 @@ function App() {
                 ) : <p style={{ textAlign: 'center', color: '#7D736A' }}>טרם עודכן</p>}
               </div>
 
+              {/* === אזור המפות המחודש עם React-Leaflet בעיצוב נקי === */}
+              <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
+                <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>המפות שלנו</h3>
+
+                <div className="status-toggle" style={{ maxWidth: '400px', margin: '0 auto 25px auto' }}>
+                  <div className={`status-option ${mapTab === 'locations' ? 'active' : ''}`} onClick={() => setMapTab('locations')}>איפה שתינו אותו</div>
+                  <div className={`status-option ${mapTab === 'origins' ? 'active' : ''}`} onClick={() => setMapTab('origins')}>מאיפה הבקבוק</div>
+                </div>
+
+                <div style={{ height: '400px', borderRadius: '16px', overflow: 'hidden', border: '1px solid #EAE6DF', backgroundColor: '#EFECE6', position: 'relative' }}>
+                  {mapTab === 'locations' ? (
+                     stats.mapLocations && stats.mapLocations.length > 0 ? (
+                      <MapContainer 
+                         center={[stats.mapLocations[0].lat, stats.mapLocations[0].lng]} 
+                         zoom={10} 
+                         style={{height: '100%', width: '100%', zIndex: 1}}
+                      >
+                         <TileLayer 
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                         />
+                         {stats.mapLocations.map((loc, idx) => (
+                            <Marker key={idx} position={[loc.lat, loc.lng]} icon={createCustomIcon(loc.wines)}>
+                              <Popup className="custom-map-popup">
+                                <h4 style={{margin: '0 0 10px 0', color: '#572C3A', borderBottom: '1px solid #EAE6DF', paddingBottom: '5px'}}>{loc.name || 'מיקום שמור'}</h4>
+                                <div style={{maxHeight: '150px', overflowY: 'auto', paddingRight: '5px'}}>
+                                   {loc.wines.map((w, i) => (
+                                      <div key={i} style={{display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center'}}>
+                                         {w.imageUrl && <img src={w.imageUrl} style={{width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #EAE6DF'}}/>}
+                                         <div>
+                                            <strong style={{display: 'block', fontSize: '0.95rem', lineHeight: '1.2'}}>{w.name}</strong>
+                                            <span style={{fontSize: '0.85rem', color: '#B49A65', fontWeight: 'bold'}}>{w.rating} ★</span>
+                                         </div>
+                                      </div>
+                                   ))}
+                                </div>
+                              </Popup>
+                            </Marker>
+                         ))}
+                      </MapContainer>
+                     ) : (
+                       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8F7F5', color: '#7D736A' }}>
+                          אין עדיין מיקומים (עם קואורדינטות) על המפה. ערוך יין קיים וסמן אותו על המפה.
+                       </div>
+                     )
+                  ) : (
+                     stats.originsMapLocations && stats.originsMapLocations.length > 0 ? (
+                      <MapContainer 
+                         center={[35.0, 15.0]} 
+                         zoom={2.5} 
+                         style={{height: '100%', width: '100%', zIndex: 1}}
+                      >
+                         <TileLayer 
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                         />
+                         {stats.originsMapLocations.map((loc, idx) => (
+                            <Marker key={idx} position={[loc.lat, loc.lng]} icon={createCustomIcon(loc.wines)}>
+                              <Popup className="custom-map-popup">
+                                <h4 style={{margin: '0 0 10px 0', color: '#572C3A', borderBottom: '1px solid #EAE6DF', paddingBottom: '5px'}}>{getCountryFlag(loc.name)} {loc.name}</h4>
+                                <div style={{maxHeight: '150px', overflowY: 'auto', paddingRight: '5px'}}>
+                                   {loc.wines.map((w, i) => (
+                                      <div key={i} style={{display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center'}}>
+                                         {w.imageUrl && <img src={w.imageUrl} style={{width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #EAE6DF'}}/>}
+                                         <div>
+                                            <strong style={{display: 'block', fontSize: '0.95rem', lineHeight: '1.2'}}>{w.name}</strong>
+                                            <span style={{fontSize: '0.85rem', color: '#B49A65', fontWeight: 'bold'}}>
+                                               {w.bottleStatus === 'stored' ? 'שמור 🍾' : `${w.rating || '-'} ★`}
+                                            </span>
+                                         </div>
+                                      </div>
+                                   ))}
+                                </div>
+                              </Popup>
+                            </Marker>
+                         ))}
+                      </MapContainer>
+                     ) : (
+                       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8F7F5', color: '#7D736A' }}>
+                          אין עדיין יינות עם מדינה מזוהה.
+                       </div>
+                     )
+                  )}
+                </div>
+              </div>
+              {/* סוף המפות */}
+
               <div className="soft-card" style={{ padding: '30px', border: '1px solid #EFECE6' }}>
                 <h3 className="serif-title" style={{ margin: '0 0 20px 0', fontSize: '1.5rem', color: '#572C3A', textAlign: 'center' }}>השתיינים הגדולים</h3>
-                
+
                 <div className="status-toggle" style={{ maxWidth: '300px', margin: '0 auto 25px auto' }}>
                   <div className={`status-option ${drinkersTab === 'individuals' ? 'active' : ''}`} onClick={() => setDrinkersTab('individuals')}>בודדים</div>
                   <div className={`status-option ${drinkersTab === 'groups' ? 'active' : ''}`} onClick={() => setDrinkersTab('groups')}>קבוצות</div>
@@ -1212,11 +1521,11 @@ function App() {
         </div>
       )}
 
-      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }\n@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
+      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
     </div>
   )
 }
 
 const labelStyle = { fontSize: '0.9rem', color: '#7D736A', marginBottom: '8px', display: 'block', fontWeight: '600' };
-
 export default App;

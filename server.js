@@ -13,8 +13,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-console.log("--- שרת מרתף היין עולה לאוויר ---");
-console.log("בדיקת מפתח Resend:", process.env.RESEND_API_KEY ? "✅ מוגדר" : "❌ חסר - משתמש במפתח דמה למניעת קריסה");
+console.log("--- Wine Cellar Server is starting ---");
+console.log("Resend API Key check:", process.env.RESEND_API_KEY ? "✅ Configured" : "❌ Missing - using dummy key to prevent crash");
 
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
@@ -40,8 +40,8 @@ const upload = multer({ storage: storage });
 
 const mongoURI = 'mongodb+srv://ilay_admin:120766ely@cluster0.whmntq6.mongodb.net/?appName=Cluster0';
 mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 5000 })
-  .then(() => console.log('✅ חיבור למסד הנתונים הצליח!'))
-  .catch((err) => console.error('❌ שגיאה בחיבור למסד הנתונים:', err.message));
+  .then(() => console.log('✅ MongoDB connected successfully!'))
+  .catch((err) => console.error('❌ MongoDB connection error:', err.message));
 
 const wineSchema = new mongoose.Schema({
   imageUrl: String,
@@ -90,10 +90,10 @@ const getWineTypeIcon = (type) => {
 };
 
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
-  console.log("--- מתחיל פענוח תווית יין ---");
+  console.log("--- Starting wine label analysis ---");
   try {
     if (!req.file) {
-      console.log("❌ לא התקבלה תמונה בשרת.");
+      console.log("❌ No image received in server.");
       return res.status(400).json({ error: 'No image uploaded' });
     }
 
@@ -154,7 +154,7 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
 
         wineData = JSON.parse(cleanJsonString);
     } catch (parseError) {
-        console.error("❌ ה-AI לא החזיר JSON תקין:", responseText);
+        console.error("❌ AI did not return valid JSON:", responseText);
         throw new Error("Invalid JSON format from Gemini");
     }
 
@@ -169,14 +169,14 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     });
     fs.unlinkSync(req.file.path); 
 
-    console.log("✅ פענוח תווית הסתיים בהצלחה!");
+    console.log("✅ Label analysis completed successfully!");
     res.json({ 
       imageUrl: cloudinaryResponse.secure_url, 
       analyzedData: wineData
     });
 
   } catch (error) {
-    console.error("❌ שגיאה כללית בפענוח היין:", error.message || error);
+    console.error("❌ General error in wine analysis:", error.message || error);
     if (req.file && fs.existsSync(req.file.path)) {
        fs.unlinkSync(req.file.path);
     }
@@ -224,7 +224,7 @@ app.post('/api/wines', async (req, res) => {
             </p>
           </div>
         `
-      }).catch(e => console.error('❌ שגיאה בשליחת המייל דרך Resend (הוספה):', e));
+      }).catch(e => console.error('❌ Error sending email via Resend (add):', e));
     }
 
   } catch (err) {
@@ -270,7 +270,7 @@ app.delete('/api/wines/:id', async (req, res) => {
             </p>
           </div>
         `
-      }).catch(e => console.error('❌ שגיאה בשליחת המייל דרך Resend (מחיקה):', e));
+      }).catch(e => console.error('❌ Error sending email via Resend (delete):', e));
     }
 
   } catch (err) {
@@ -280,7 +280,7 @@ app.delete('/api/wines/:id', async (req, res) => {
 });
 
 app.put('/api/wines/:id', async (req, res) => {
-  console.log(`📬 הגיעה בקשת עריכה ליין: ${req.params.id}`);
+  console.log(`📬 Received edit request for wine:`, req.params.id);
   try {
     const oldWine = await Wine.findById(req.params.id);
 
@@ -376,8 +376,8 @@ app.put('/api/wines/:id', async (req, res) => {
           </div>
         `
       })
-      .then(data => console.log("✉️ התראת מייל נשלחה בהצלחה ברקע דרך Resend"))
-      .catch(emailError => console.error('❌ שגיאה בשליחת המייל דרך Resend:', emailError));
+      .then(data => console.log("✉️ Email notification sent successfully via Resend"))
+      .catch(emailError => console.error('❌ Error sending email via Resend:', emailError));
     }
 
   } catch (err) {
@@ -396,5 +396,5 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 השרת רץ ומאזין על פורט ${PORT}`);
+    console.log("🚀 Server is running and listening on port", PORT);
 });
